@@ -66,6 +66,33 @@ void __box_initialize_rhs(box_type *box, int grid_id, double h){
 }
 
 //==============================================================================
+void __box_check_answer(box_type *box, int grid_id, double h){
+  int i,j,k;
+  double twoPi = 2.0 * 3.1415926535;
+  double solution;
+  double pt_error;
+  double eps = 0.00000001; // single precision
+  double max_error = 0.0;
+
+  for(k=0;k<box->dim.k;k++){
+  for(j=0;j<box->dim.j;j++){
+  for(i=0;i<box->dim.i;i++){
+    double x = h*(double)(i+box->low.i);
+    double y = h*(double)(j+box->low.j);
+    double z = h*(double)(k+box->low.k);
+    int ijk = (i+box->ghosts) + (j+box->ghosts)*box->pencil + (k+box->ghosts)*box->plane;
+    double exact_solution = (-1.0/(3.0*twoPi*twoPi))*sin(twoPi*x)*sin(twoPi*y)*sin(twoPi*z);
+    solution = box->grids[grid_id][ijk];
+    pt_error = fabs(solution - exact_solution); // difference between exact solution and calculated solution
+    if (pt_error > max_error){max_error = pt_error;} 
+  }}}
+
+  if ( max_error > eps){printf("Maximum error in box = %16.8f \n",max_error);} 
+
+} 
+
+
+//==============================================================================
 int main(int argc, char **argv){
   int MPI_Rank=0;
   int MPI_Tasks=1;
@@ -219,6 +246,9 @@ int main(int argc, char **argv){
   for(s=0;s<sMax;s++)MGSolve(&domain_CA,__u,__f,1,a,b,h0);
   //- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
   // verification....
+  //- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+  for(box=0;box< domain_1.numsubdomains;box++){__box_check_answer(& domain_1.subdomains[box].levels[0],__u,h0);}
+  for(box=0;box<domain_CA.numsubdomains;box++){__box_check_answer(&domain_CA.subdomains[box].levels[0],__u,h0);}
   //- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
   print_timing(&domain_1 );
   print_timing(&domain_CA);

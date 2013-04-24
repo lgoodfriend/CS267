@@ -623,7 +623,8 @@ void CycleMG(domain_type * domain, int e_id, int R_id, double a, double b, doubl
       scale_grid(domain,level,__r,1.0,__r0);				// r[] = r0[]
       scale_grid(domain,level,__p,1.0,__r0);				// p[] = r0[]
       double r_dot_r0 = dot(domain,level,__r,__r0);			// r_dot_r0 = dot(r,r0)
-      do{								// do{
+      double r_dot_r = r_dot_r0;
+      do{/*								// do{
         exchange_boundary(domain,level,__p,1,0,0);			//   exchange_boundary(p)
         apply_op(domain,level,__Ap,__p,a,b,hLevel);			//   Ap = A(p)
         double Ap_dot_r0 = dot(domain,level,__Ap,__r0);			//   Ap_dot_r0 = dot(Ap,r0)
@@ -648,6 +649,20 @@ void CycleMG(domain_type * domain, int e_id, int R_id, double a, double b, doubl
         r_dot_r0 = r_dot_r0_new;					//   r_dot_r0 = r_dot_r0_new   (save old r_dot_r0)
         j++;
         // FIX do convergence test (norm()) on r[] ?
+*/    
+        exchange_boundary(domain,level,__p,1,0,0);			//   exchange_boundary(p)
+        apply_op(domain,level,__Ap,__p,a,b,hLevel);			//   Ap = A(p)
+        double Ap_dot_p = dot(domain, level, __Ap, __p);                //   Ap_dot_p = dot(Ap,p)
+        double alpha = r_dot_r / Ap_dot_p;				//   alpha = r_dot_r / Ap_dot_p
+        add_grids(domain,level,  e_id,  1.0,e_id,   alpha,__p);	        //   e_id[] = e_id[] + alpha*p[]
+        add_grids(domain,level,__r,1.0,__r,-alpha,__Ap);		//   r[] = r[] - alpha*Ap[]
+        double r_dot_r_new = dot(domain,level,__r,__r);		        //   r_dot_r0_new = dot(r,r)
+        double beta = (r_dot_r_new/r_dot_r);		                //   beta = (r_dot_r_new/r_dot_r)
+        add_grids(domain,level,__p   ,1.0,__r,  beta,__p);		//   p[] = r[] + beta*p[]
+        r_dot_r = r_dot_r_new;					        //   r_dot_r = r_dot_r_new   (save old r_dot_r)
+        j++;
+        // FIX do convergence test (norm()) on r[] ?
+  
       }while(j<jMax);							// }while(j<jMax);
     #else // just multiple GSRB's
       #warning Defaulting to simple GSRB bottom solver with fixed number of iterations...

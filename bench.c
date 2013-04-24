@@ -211,8 +211,8 @@ int main(int argc, char **argv){
                               ranks_in_i,ranks_in_j,ranks_in_k,
                               MPI_Rank,10,4,levels_in_vcycle);
   //- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
-  double  a=0.9;
-  double  b=0.9;
+  double  a=0.0;
+  double  b=-1.0;
   double h0=1.0/((double)(domain_1.dim.i));
   int box;
   //- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 

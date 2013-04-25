@@ -611,7 +611,7 @@ void CycleMG(domain_type * domain, int e_id, int R_id, double a, double b, doubl
     uint64_t _timeBottomStart = CycleTime();
     level = domain->numLevels-1;
     hLevel = h0 * (double)(1<<level);
-    #ifdef __USE_BICGSTAB
+    #if defined __USE_BICGSTAB
       #warning Using BiCGStab bottom solver with fixed number of iterations...
       // based on scanned page sent to me by Erin/Nick
       // Algorithm 7.7 in Iterative Methods for Sparse Linear Systems(Yousef Saad)???
@@ -624,7 +624,7 @@ void CycleMG(domain_type * domain, int e_id, int R_id, double a, double b, doubl
       scale_grid(domain,level,__p,1.0,__r0);				// p[] = r0[]
       double r_dot_r0 = dot(domain,level,__r,__r0);			// r_dot_r0 = dot(r,r0)
       double r_dot_r = r_dot_r0;
-      do{/*								// do{
+      do{								// do{
         exchange_boundary(domain,level,__p,1,0,0);			//   exchange_boundary(p)
         apply_op(domain,level,__Ap,__p,a,b,hLevel);			//   Ap = A(p)
         double Ap_dot_r0 = dot(domain,level,__Ap,__r0);			//   Ap_dot_r0 = dot(Ap,r0)
@@ -649,7 +649,21 @@ void CycleMG(domain_type * domain, int e_id, int R_id, double a, double b, doubl
         r_dot_r0 = r_dot_r0_new;					//   r_dot_r0 = r_dot_r0_new   (save old r_dot_r0)
         j++;
         // FIX do convergence test (norm()) on r[] ?
-*/    
+	
+      }while(j<jMax);							// }while(j<jMax);
+    #elif defined __USE_CG
+      // based on scanned page sent to me by Erin/Nick
+      // Algorithm 7.7 in Iterative Methods for Sparse Linear Systems(Yousef Saad)???
+      int jMax=10;
+      int j=0;
+      if(level>0)zero_grid(domain,level,e_id);				// e_id[] = 0
+      exchange_boundary(domain,level,e_id,1,0,0);			// exchange_boundary(e_id)
+      residual(domain,level,__r0,e_id,R_id,a,b,hLevel);			// r0[] = R_id[] - A(e_id)
+      scale_grid(domain,level,__r,1.0,__r0);				// r[] = r0[]
+      scale_grid(domain,level,__p,1.0,__r0);				// p[] = r0[]
+      double r_dot_r0 = dot(domain,level,__r,__r0);			// r_dot_r0 = dot(r,r0)
+      double r_dot_r = r_dot_r0;
+      do{								// do{
         exchange_boundary(domain,level,__p,1,0,0);			//   exchange_boundary(p)
         apply_op(domain,level,__Ap,__p,a,b,hLevel);			//   Ap = A(p)
         double Ap_dot_p = dot(domain, level, __Ap, __p);                //   Ap_dot_p = dot(Ap,p)

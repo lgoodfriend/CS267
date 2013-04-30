@@ -34,7 +34,6 @@ void residual(domain_type * domain, int level,  int res_id, int phi_id, int rhs_
     double * __restrict__ beta_j = domain->subdomains[box].levels[level].grids[__beta_j] + ghosts*plane + ghosts*pencil + ghosts;
     double * __restrict__ beta_k = domain->subdomains[box].levels[level].grids[__beta_k] + ghosts*plane + ghosts*pencil + ghosts;
     double * __restrict__ res    = domain->subdomains[box].levels[level].grids[  res_id] + ghosts*plane + ghosts*pencil + ghosts;
-
     #pragma omp parallel for private(k,j,i) if(omp_within_a_box) collapse(2)
     for(k=0;k<dim_k;k++){
     for(j=0;j<dim_j;j++){

@@ -7,7 +7,7 @@
 HEADERS =
 EXTRA = bench.c mg.c box.c timer.x86.c
 TARGETS = run.hopper.naive run.hopper.reference run.hopper.fusion \
-	  run.hopper.ompif run.hopper.ompif.cg test.ompif.cg
+	  run.hopper.ompif test.hopper.ompif.cg test.hopper.ompif.bicgstab
 
 all:	$(TARGETS)
 
@@ -16,11 +16,16 @@ run.hopper.naive: $(EXTRA) operators.naive.c
 		operators.naive.c \
 		-D_MPI -D__PRINT_COMMUNICATION_BREAKDOWN -o $@
 
-run.hopper.ompif.cg: $(EXTRA) operators.ompif.c
+test.hopper.ompif.bicgstab: $(EXTRA) operators.ompif.c
 	cc -O3 -fno-alias -fno-fnalias -msse3 -openmp $(EXTRA) \
 		operators.ompif.c \
+		-D_MPI -D__PRINT_COMMUNICATION_BREAKDOWN -D__USE_BICGSTAB \
+		-o $@ -g
+test.hopper.ompif.cg: $(EXTRA) operators.ompif.c
+	cc -O0 -fno-alias -fno-fnalias -check-pointers=write -msse3 -openmp $(EXTRA) \
+		operators.ompif.c -traceback -check=stack,uninit \
 		-D_MPI -D__PRINT_COMMUNICATION_BREAKDOWN -D__USE_CG \
-		-o $@
+		-o $@ -g
 
 run.hopper.reference: $(EXTRA) operators.reference.c
 	cc -O3 -fno-alias -fno-fnalias -msse3 -openmp $(EXTRA) \

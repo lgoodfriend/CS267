@@ -37,7 +37,9 @@ int create_subdomain(subdomain_type * box, int subdomain_low_i, int subdomain_lo
   memory_allocated += numLevels*sizeof(box_type);
   for(level=0;level<numLevels;level++){
     int __numGrids = numGrids;
-    #ifdef __USE_BICGSTAB
+    #if defined __USE_BICGSTAB
+    if(level == (numLevels-1))__numGrids+=6; // BiCGStab requires additional grids r0,r,p,s,Ap,As
+    #elif defined  __USE_CG
     if(level == (numLevels-1))__numGrids+=6; // BiCGStab requires additional grids r0,r,p,s,Ap,As
     #endif
     memory_allocated += create_box(&box->levels[level],__numGrids,subdomain_low_i>>level,subdomain_low_j>>level,subdomain_low_k>>level,
@@ -567,7 +569,7 @@ void MGSolve(domain_type * domain, int e0_id, int R0_id, int homogeneous, double
 }
 
 //------------------------------------------------------------------------------------------------------------------------------
-void CycleMG(domain_type * domain, int e_id, int R_id, double a, double b, double h0){
+void CycleMG(domain_type * domain, int e_id, int R_id, const double a, const double b, const double h0){
   int level,box;
   //int SwitchToInterBoxParallelismAtLevel = 1;
   int numVCycles       = 10;
@@ -578,6 +580,7 @@ void CycleMG(domain_type * domain, int e_id, int R_id, double a, double b, doubl
   int ghosts = domain->ghosts;
   double hLevel;
 
+  printf("Made it to CyclemMG\n");
 
   for(v=0;v<numVCycles;v++){
     // down the v-cycle...
@@ -652,17 +655,16 @@ void CycleMG(domain_type * domain, int e_id, int R_id, double a, double b, doubl
 	
       }while(j<jMax);							// }while(j<jMax);
     #elif defined __USE_CG
+      #warning Using Conjugate Gradient Solver with fixed number of iterations...
       // based on scanned page sent to me by Erin/Nick
       // Algorithm 7.7 in Iterative Methods for Sparse Linear Systems(Yousef Saad)???
       int jMax=10;
       int j=0;
       if(level>0)zero_grid(domain,level,e_id);				// e_id[] = 0
       exchange_boundary(domain,level,e_id,1,0,0);			// exchange_boundary(e_id)
-      residual(domain,level,__r0,e_id,R_id,a,b,hLevel);			// r0[] = R_id[] - A(e_id)
-      scale_grid(domain,level,__r,1.0,__r0);				// r[] = r0[]
-      scale_grid(domain,level,__p,1.0,__r0);				// p[] = r0[]
-      double r_dot_r0 = dot(domain,level,__r,__r0);			// r_dot_r0 = dot(r,r0)
-      double r_dot_r = r_dot_r0;
+      residual(domain,level,__r,e_id,R_id,a,b,hLevel);			// r[] = R_id[] - A(e_id)
+      scale_grid(domain,level,__p,1.0,__r);				// p[] = r[]
+      double r_dot_r = dot(domain,level,__r,__r);			// r_dot_r = dot(r,r)
       do{								// do{
         exchange_boundary(domain,level,__p,1,0,0);			//   exchange_boundary(p)
         apply_op(domain,level,__Ap,__p,a,b,hLevel);			//   Ap = A(p)
@@ -670,13 +672,13 @@ void CycleMG(domain_type * domain, int e_id, int R_id, double a, double b, doubl
         double alpha = r_dot_r / Ap_dot_p;				//   alpha = r_dot_r / Ap_dot_p
         add_grids(domain,level,  e_id,  1.0,e_id,   alpha,__p);	        //   e_id[] = e_id[] + alpha*p[]
         add_grids(domain,level,__r,1.0,__r,-alpha,__Ap);		//   r[] = r[] - alpha*Ap[]
-        double r_dot_r_new = dot(domain,level,__r,__r);		        //   r_dot_r0_new = dot(r,r)
+        double r_dot_r_new = dot(domain,level,__r,__r);		        //   r_dot_r_new = dot(r,r)
         double beta = (r_dot_r_new/r_dot_r);		                //   beta = (r_dot_r_new/r_dot_r)
         add_grids(domain,level,__p   ,1.0,__r,  beta,__p);		//   p[] = r[] + beta*p[]
         r_dot_r = r_dot_r_new;					        //   r_dot_r = r_dot_r_new   (save old r_dot_r)
         j++;
         // FIX do convergence test (norm()) on r[] ?
-  
+	if (norm(domain, level, __r) < 0.00001) break ;
       }while(j<jMax);							// }while(j<jMax);
     #else // just multiple GSRB's
       #warning Defaulting to simple GSRB bottom solver with fixed number of iterations...

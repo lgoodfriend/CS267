@@ -52,6 +52,7 @@
 void __box_initialize_rhs(box_type *box, int grid_id, double h){
   int i,j,k;
   double twoPi = 2.0 * 3.1415926535;
+  double value;
   memset(box->grids[grid_id],0,box->volume*sizeof(double)); // zero out the grid and ghost zones
   for(k=0;k<box->dim.k;k++){
   for(j=0;j<box->dim.j;j++){
@@ -60,7 +61,12 @@ void __box_initialize_rhs(box_type *box, int grid_id, double h){
     double y = h*(double)(j+box->low.j);
     double z = h*(double)(k+box->low.k);
     int ijk = (i+box->ghosts) + (j+box->ghosts)*box->pencil + (k+box->ghosts)*box->plane;
-    double value = sin(twoPi*x)*sin(twoPi*y)*sin(twoPi*z);
+    //double value = sin(twoPi*x)*sin(twoPi*y)*sin(twoPi*z);
+    if ((x>=0.25) && (x<0.75)){
+      value = 1.0;
+    }else{
+      value = -1.0;
+    }
     box->grids[grid_id][ijk] = value;
   }}}
 }
@@ -87,7 +93,7 @@ void __box_check_answer(box_type *box, int grid_id, double h){
     if (pt_error > max_error){max_error = pt_error;} 
   }}}
 
-  if ( max_error > eps){printf("Maximum error in box = %16.8f \n",max_error);} 
+  //if ( max_error > eps){printf("Maximum error in box = %16.8f \n",max_error);} 
 
 } 
 

@@ -19,6 +19,9 @@
 #include "mg.h"
 #include "operators.h"
 #include "timer.h"
+
+// number of s steps to do
+#define ss 2
 //------------------------------------------------------------------------------------------------------------------------------
 int create_subdomain(subdomain_type * box, int subdomain_low_i, int subdomain_low_j, int subdomain_low_k,  
                                        int subdomain_dim_i, int subdomain_dim_j, int subdomain_dim_k, 
@@ -658,8 +661,7 @@ void CycleMG(domain_type * domain, int e_id, int R_id, const double a, const dou
       }while(j<jMax);							// }while(j<jMax);
     #elif defined __USE_CACG
       #warning Using Communication Avoiding Conjugate Gradient Solver with fixed number of iterations...
-      int maxits=10;
-      int s=2;
+      const int maxits=10;
       if(level>0)zero_grid(domain,level,e_id);				// e_id[] = 0
       exchange_boundary(domain,level,e_id,1,0,0);			// exchange_boundary(e_id)
       residual(domain,level,__r,e_id,R_id,a,b,hLevel);			// r[] = R_id[] - A(e_id)
@@ -667,24 +669,38 @@ void CycleMG(domain_type * domain, int e_id, int R_id, const double a, const dou
       int k=0;
       double r_dot_r = dot(domain,level,__r,__r);			// r_dot_r = dot(r,r)
       do{								// do{
+	if (norm(domain, level, __r) < 0.00001) break ;                 //   check for convergence
         printf("k %d\n",k);
-        int j;
-        for(j=1;s;j++){
-          printf("j %d\n",j);
-          exchange_boundary(domain,level,__p,1,0,0);			//   exchange_boundary(p)
-          apply_op(domain,level,__Ap,__p,a,b,hLevel);			//   Ap = A(p)
-          double Ap_dot_p = dot(domain, level, __Ap, __p);              //   Ap_dot_p = dot(Ap,p)
-          double alpha = r_dot_r / Ap_dot_p;				//   alpha = r_dot_r / Ap_dot_p
-          add_grids(domain,level,  e_id,  1.0,e_id,   alpha,__p);	        //   e_id[] = e_id[] + alpha*p[]
-          add_grids(domain,level,__r,1.0,__r,-alpha,__Ap);		//   r[] = r[] - alpha*Ap[]
-          double r_dot_r_new = dot(domain,level,__r,__r);		        //   r_dot_r_new = dot(r,r)
-          double beta = (r_dot_r_new/r_dot_r);		                //   beta = (r_dot_r_new/r_dot_r)
-          add_grids(domain,level,__p   ,1.0,__r,  beta,__p);		//   p[] = r[] + beta*p[]
-          r_dot_r = r_dot_r_new;					//   r_dot_r = r_dot_r_new   (save old r_dot_r)
-	  if (norm(domain, level, __r) < 0.00001) break ;
+        double phat[2*ss+1][ss+1] = {};                                 //   initialize phat
+        phat[0][0] = 1.;
+        double rhat[2*ss+1][ss+1] = {};                                 //   initialize rhat
+        rhat[ss][0] = 1.;
+        double xhat[2*ss+1][ss+1] = {};                                 //   initialize xhat
+        double P[ss][10] = {};                                          //   FIX FIX FIX compute matrix powers kernel for P
+        double R[ss][11] = {};                                          //   FIX FIX FIX compute matrix powers kernel for R
+        int i;
+        for (i=1;ss;i++){                                               //   FIX FIX FIX append that column to R
+          R[i-1][10]=(double)i;
         }
-        k++;
-      }while(k*s<maxits);						// }while(ks<maxits);
+        double PR[ss][21];                                              //   FIX FIX FIX form [P R]
+        // form Gram matrix
+        int j;
+        for(j=1;ss;j++){                                                //   for{ s step
+          printf("j %d\n",j);
+          exchange_boundary(domain,level,__p,1,0,0);			//      exchange_boundary(p)
+          // apply T to phat (don't need to "calculate" T, since it's mostly 0s)
+          apply_op(domain,level,__Ap,__p,a,b,hLevel);			//      Ap = A(p)
+          double Ap_dot_p = dot(domain, level, __Ap, __p);              //      Ap_dot_p = dot(Ap,p)
+          double alpha = r_dot_r / Ap_dot_p;				//      alpha = r_dot_r / Ap_dot_p
+          add_grids(domain,level,  e_id,  1.0,e_id,   alpha,__p);	//      e_id[] = e_id[] + alpha*p[]
+          add_grids(domain,level,__r,1.0,__r,-alpha,__Ap);		//      r[] = r[] - alpha*Ap[]
+          double r_dot_r_new = dot(domain,level,__r,__r);		//      r_dot_r_new = dot(r,r)
+          double beta = (r_dot_r_new/r_dot_r);		                //      beta = (r_dot_r_new/r_dot_r)
+          add_grids(domain,level,__p   ,1.0,__r,  beta,__p);		//      p[] = r[] + beta*p[]
+          r_dot_r = r_dot_r_new;					//      r_dot_r = r_dot_r_new   (save old r_dot_r)
+        }
+        k++;                                                            
+      }while(k*ss<maxits);						// }while(ks<maxits);
     #elif defined __USE_CG
       #warning Using Conjugate Gradient Solver with fixed number of iterations...
       // based on scanned page sent to me by Erin/Nick

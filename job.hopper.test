@@ -15,5 +15,6 @@ module swap PrgEnv-pgi PrgEnv-intel
 export OMP_NUM_THREADS=6
 #export OMP_WAIT_POLICY=active#
 #aprun -n 1  -d  6  -N  4  -S 1  -ss  -cc numa_node ./test.hopper.ompif.bicgstab       6  4 2 2  1 2 2
-aprun -n 4  -d  6  -N  4  -S 1  -ss  -cc numa_node ./test.hopper.ompif.cg       6  4 2 2  1 2 2
+#aprun -n 4  -d  6  -N  4  -S 1  -ss  -cc numa_node ./test.hopper.ompif.cg       6  4 2 2  1 2 2
+aprun -n 4  -d  6  -N  4  -S 1  -ss  -cc numa_node ./test.hopper.ompif.cacg       6  4 2 2  1 2 2
 

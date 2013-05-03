@@ -233,3 +233,46 @@ void scale_grid(domain_type * domain, int level, int id_c, double scale_a, int i
   }
   domain->cycles.blas1[level] += (uint64_t)(CycleTime()-_timeStart);
 }
+
+
+void PR_mult(domain_type * domain, int level, int id_p1, int id_p2, int id_p3, int id_r1, int id_r2, double xhat[5], int id_t){ 
+  uint64_t _timeStart = CycleTime();
+
+  int CollaborativeThreadingBoxSize = 100000; // i.e. never
+  #ifdef __COLLABORATIVE_THREADING
+    //#warning using Collaborative Threading for large boxes in interpolation()
+    CollaborativeThreadingBoxSize = 1 << __COLLABORATIVE_THREADING;
+  #endif
+  int omp_across_boxes = (domain->subdomains[0].levels[level].dim.i <  CollaborativeThreadingBoxSize);
+  int omp_within_a_box = (domain->subdomains[0].levels[level].dim.i >= CollaborativeThreadingBoxSize);
+  int box;
+
+  #pragma omp parallel for private(box) if(omp_across_boxes)
+  for(box=0;box<domain->numsubdomains;box++){
+    int i,j,k;
+    int pencil = domain->subdomains[box].levels[level].pencil;
+    int  plane = domain->subdomains[box].levels[level].plane;
+    int ghosts = domain->subdomains[box].levels[level].ghosts;
+    int  dim_k = domain->subdomains[box].levels[level].dim.k;
+    int  dim_j = domain->subdomains[box].levels[level].dim.j;
+    int  dim_i = domain->subdomains[box].levels[level].dim.i;
+    double * __restrict__ grid_p1 = domain->subdomains[box].levels[level].grids[id_p1];
+    double * __restrict__ grid_p2 = domain->subdomains[box].levels[level].grids[id_p2];
+    double * __restrict__ grid_p3 = domain->subdomains[box].levels[level].grids[id_p3];
+    double * __restrict__ grid_r1 = domain->subdomains[box].levels[level].grids[id_r1];
+    double * __restrict__ grid_r2 = domain->subdomains[box].levels[level].grids[id_r2];
+    double * __restrict__ grid_t  = domain->subdomains[box].levels[level].grids[id_t];
+    #pragma omp parallel for private(k,j,i) if(omp_within_a_box) collapse(2)
+    for(k=0;k<dim_k;k++){
+     for(j=0;j<dim_j;j++){
+      for(i=0;i<dim_i;i++){
+        int ijk = (i+ghosts) + (j+ghosts)*pencil + (k+ghosts)*plane;
+        grid_t[ijk] = xhat[0]*grid_p1[ijk] +
+                      xhat[1]*grid_p2[ijk] +
+                      xhat[2]*grid_p3[ijk] +
+                      xhat[3]*grid_r1[ijk] +
+                      xhat[4]*grid_r2[ijk];
+    }}}
+  }
+  domain->cycles.blas1[level] += (uint64_t)(CycleTime()-_timeStart);
+}

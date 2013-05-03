@@ -45,7 +45,7 @@ int create_subdomain(subdomain_type * box, int subdomain_low_i, int subdomain_lo
     #elif defined  __USE_CG
     if(level == (numLevels-1))__numGrids+=6; // BiCGStab requires additional grids r0,r,p,s,Ap,As
     #elif defined  __USE_CACG
-    if(level == (numLevels-1))__numGrids+=6; // BiCGStab requires additional grids r0,r,p,s,Ap,As
+    if(level == (numLevels-1))__numGrids+=11; // BiCGStab requires additional grids r0,r,p,s,Ap,As
     #endif
     memory_allocated += create_box(&box->levels[level],__numGrids,subdomain_low_i>>level,subdomain_low_j>>level,subdomain_low_k>>level,
                                                                   subdomain_dim_i>>level,subdomain_dim_j>>level,subdomain_dim_k>>level,ghosts);
@@ -670,34 +670,80 @@ void CycleMG(domain_type * domain, int e_id, int R_id, const double a, const dou
       double r_dot_r = dot(domain,level,__r,__r);			// r_dot_r = dot(r,r)
       do{								// do{
 	if (norm(domain, level, __r) < 0.00001) break ;                 //   check for convergence
-        printf("k %d\n",k);
         double phat[2*ss+1][ss+1] = {};                                 //   initialize phat
         phat[0][0] = 1.;
         double rhat[2*ss+1][ss+1] = {};                                 //   initialize rhat
         rhat[ss][0] = 1.;
         double xhat[2*ss+1][ss+1] = {};                                 //   initialize xhat
-        double P[ss][10] = {};                                          //   FIX FIX FIX compute matrix powers kernel for P
-        double R[ss][11] = {};                                          //   FIX FIX FIX compute matrix powers kernel for R
-        int i;
-        for (i=1;ss;i++){                                               //   FIX FIX FIX append that column to R
-          R[i-1][10]=(double)i;
-        }
-        double PR[ss][21];                                              //   FIX FIX FIX form [P R]
+        // compute matrix powers kernel for p                           //   P = [Mp1 Mp2 Mp3]
+        scale_grid(domain,level,__Mp1,1.0,__p);                         //   Mp1 = p
+        exchange_boundary(domain,level,__Mp1,1,0,0);			//   exchange_boundary(Mp1)
+        apply_op(domain,level,__Mp2,__Mp1,a,b,hLevel);                  //   Mp2 = Ap
+        exchange_boundary(domain,level,__Mp2,1,0,0);			//   exchange_boundary(Mp2)
+        apply_op(domain,level,__Mp3,__Mp2,a,b,hLevel);                  //   Mp2 = AAp
+        exchange_boundary(domain,level,__Mp3,1,0,0);			//   exchange_boundary(Mp3)
+        // compute matrix powers kernel for r                           //   R = [Mr1 Mr2]
+        scale_grid(domain,level,__Mr1,1.0,__r);                         //   Mr1 = r
+        exchange_boundary(domain,level,__Mr1,1,0,0);			//   exchange_boundary(Mr1)
+        apply_op(domain,level,__Mr2,__Mr1,a,b,hLevel);                  //   Mr2 = Ar
+        exchange_boundary(domain,level,__Mr2,1,0,0);			//   exchange_boundary(Mr2)
         // form Gram matrix
+        double G[2*ss+1][2*ss+1] = {};                                  //   G = [P R]^T[P R] 
+        int m,n;
+        G[0][0] = dot(domain,level,__Mp1,__Mp1);  
+        G[0][1] = dot(domain,level,__Mp1,__Mp2);  
+        G[0][2] = dot(domain,level,__Mp1,__Mp3);  
+        G[0][3] = dot(domain,level,__Mp1,__Mr1);  
+        G[0][4] = dot(domain,level,__Mp1,__Mr2);  
+        G[1][0] = dot(domain,level,__Mp2,__Mp1);  
+        G[1][1] = dot(domain,level,__Mp2,__Mp2);  
+        G[1][2] = dot(domain,level,__Mp2,__Mp3);  
+        G[1][3] = dot(domain,level,__Mp2,__Mr1);  
+        G[1][4] = dot(domain,level,__Mp2,__Mr2);  
+        G[2][0] = dot(domain,level,__Mp3,__Mp1);  
+        G[2][1] = dot(domain,level,__Mp3,__Mp2);  
+        G[2][2] = dot(domain,level,__Mp3,__Mp3);  
+        G[2][3] = dot(domain,level,__Mp3,__Mr1);  
+        G[2][4] = dot(domain,level,__Mp3,__Mr2);  
+        G[3][0] = dot(domain,level,__Mr1,__Mp1);  
+        G[3][1] = dot(domain,level,__Mr1,__Mp2);  
+        G[3][2] = dot(domain,level,__Mr1,__Mp3);  
+        G[3][3] = dot(domain,level,__Mr1,__Mr1);  
+        G[3][4] = dot(domain,level,__Mr1,__Mr2);  
+        G[4][0] = dot(domain,level,__Mr2,__Mp1);  
+        G[4][1] = dot(domain,level,__Mr2,__Mp2);  
+        G[4][2] = dot(domain,level,__Mr2,__Mp3);  
+        G[4][3] = dot(domain,level,__Mr2,__Mr1);  
+        G[4][4] = dot(domain,level,__Mr2,__Mr2);  
+        scale_grid(domain,level,__e_id_old,1.0,e_id);                   //   e_id_old = e_id                                            
         int j;
         for(j=1;ss;j++){                                                //   for{ s step
-          printf("j %d\n",j);
-          exchange_boundary(domain,level,__p,1,0,0);			//      exchange_boundary(p)
-          // apply T to phat (don't need to "calculate" T, since it's mostly 0s)
-          apply_op(domain,level,__Ap,__p,a,b,hLevel);			//      Ap = A(p)
-          double Ap_dot_p = dot(domain, level, __Ap, __p);              //      Ap_dot_p = dot(Ap,p)
-          double alpha = r_dot_r / Ap_dot_p;				//      alpha = r_dot_r / Ap_dot_p
-          add_grids(domain,level,  e_id,  1.0,e_id,   alpha,__p);	//      e_id[] = e_id[] + alpha*p[]
-          add_grids(domain,level,__r,1.0,__r,-alpha,__Ap);		//      r[] = r[] - alpha*Ap[]
-          double r_dot_r_new = dot(domain,level,__r,__r);		//      r_dot_r_new = dot(r,r)
-          double beta = (r_dot_r_new/r_dot_r);		                //      beta = (r_dot_r_new/r_dot_r)
-          add_grids(domain,level,__p   ,1.0,__r,  beta,__p);		//      p[] = r[] + beta*p[]
-          r_dot_r = r_dot_r_new;					//      r_dot_r = r_dot_r_new   (save old r_dot_r)
+          // calculate Tphat
+          double Tphat[2*ss+1][ss+1] = {};
+          for(m=1;2*ss+1;m++){
+            for(n=1;ss+1;n++){
+              if((m==1)||(m==ss+2)){
+                Tphat[m][n] = 0.;
+              }else if(m==ss+1){
+                Tphat[m][n] = phat[m][n];
+              }else{
+                Tphat[m][n] = phat[m+1][n];
+              }
+            }
+          }
+          // calculate Grhat and GTphat
+          // calculate rhat dot Grhat and phat dot GTphat
+          // calculate alpha
+          // xhat = xhat + alpha*phat
+          PR_mult(domain,level,__Mp1,__Mp2,__Mp3,__Mr1,__Mr2,xhat,__temp); // temp = PR*xhat
+          add_grids(domain,level,e_id,1.0,__e_id_old,1.0,__temp);            // e_id = e_id_old + PR*xhat
+          // rhat = rhat - alpha*Tphat
+          // r = PR*rhat //needs grid
+          // calculate Grhat_new
+          // calculate rhat_new dot Grhat_new
+          // calculate beta
+          // phat = rhat + beta*phat
+          // p = PR*phat //needs grid  
         }
         k++;                                                            
       }while(k*ss<maxits);						// }while(ks<maxits);

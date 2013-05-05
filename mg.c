@@ -20,8 +20,6 @@
 #include "operators.h"
 #include "timer.h"
 
-// number of s steps to do
-#define ss 2
 //------------------------------------------------------------------------------------------------------------------------------
 int create_subdomain(subdomain_type * box, int subdomain_low_i, int subdomain_low_j, int subdomain_low_k,  
                                        int subdomain_dim_i, int subdomain_dim_j, int subdomain_dim_k, 
@@ -670,6 +668,8 @@ void CycleMG(domain_type * domain, int e_id, int R_id, const double a, const dou
       double r_dot_r = dot(domain,level,__r,__r);			// r_dot_r = dot(r,r)
       do{								// do{
 	if (norm(domain, level, __r) < 0.00001) break ;                 //   check for convergence
+
+        /* TODO: adjust [rpx]hat so that they are laid out column-major */
         double phat[2*ss+1][ss+1] = {};                                 //   initialize phat
         phat[0][0] = 1.;
         double rhat[2*ss+1][ss+1] = {};                                 //   initialize rhat
@@ -680,7 +680,7 @@ void CycleMG(domain_type * domain, int e_id, int R_id, const double a, const dou
         exchange_boundary(domain,level,__Mp1,1,0,0);			//   exchange_boundary(Mp1)
         apply_op(domain,level,__Mp2,__Mp1,a,b,hLevel);                  //   Mp2 = Ap
         exchange_boundary(domain,level,__Mp2,1,0,0);			//   exchange_boundary(Mp2)
-        apply_op(domain,level,__Mp3,__Mp2,a,b,hLevel);                  //   Mp2 = AAp
+        apply_op(domain,level,__Mp3,__Mp2,a,b,hLevel);                  //   Mp3 = AAp
         exchange_boundary(domain,level,__Mp3,1,0,0);			//   exchange_boundary(Mp3)
         // compute matrix powers kernel for r                           //   R = [Mr1 Mr2]
         scale_grid(domain,level,__Mr1,1.0,__r);                         //   Mr1 = r
@@ -689,7 +689,6 @@ void CycleMG(domain_type * domain, int e_id, int R_id, const double a, const dou
         exchange_boundary(domain,level,__Mr2,1,0,0);			//   exchange_boundary(Mr2)
         // form Gram matrix
         double G[2*ss+1][2*ss+1] = {};                                  //   G = [P R]^T[P R] 
-        int m,n;
         G[0][0] = dot(domain,level,__Mp1,__Mp1);  
         G[0][1] = dot(domain,level,__Mp1,__Mp2);  
         G[0][2] = dot(domain,level,__Mp1,__Mp3);  
@@ -716,24 +715,46 @@ void CycleMG(domain_type * domain, int e_id, int R_id, const double a, const dou
         G[4][3] = dot(domain,level,__Mr2,__Mr1);  
         G[4][4] = dot(domain,level,__Mr2,__Mr2);  
         scale_grid(domain,level,__e_id_old,1.0,e_id);                   //   e_id_old = e_id                                            
-        int j;
-        for(j=1;ss;j++){                                                //   for{ s step
+        int j,m,n,o;
+
+        double Tphat[2*ss+1] = {};
+        double Grhat[2*ss+1] = {};
+        double GTphat[2*ss+1] = {};
+        for(j=1;j <= ss;j++){                                            //   for{ s step
           // calculate Tphat
-          double Tphat[2*ss+1][ss+1] = {};
-          for(m=1;2*ss+1;m++){
-            for(n=1;ss+1;n++){
+          for(m=1; m<2*ss+1;m++){
+            for(n=1;n<ss+1;n++){
               if((m==1)||(m==ss+2)){
                 Tphat[m][n] = 0.;
               }else if(m==ss+1){
                 Tphat[m][n] = phat[m][n];
               }else{
                 Tphat[m][n] = phat[m+1][n];
-              }
-            }
-          }
-          // calculate Grhat and GTphat
-          // calculate rhat dot Grhat and phat dot GTphat
+              }}}
+
+          // calculate Grhat
+          for(m=0;m<2*ss+1;m++){
+            for(n=0;n<2*ss+1;n++){
+              Grhat[m] += G[m][n]*rhat[n][j];
+            }}
+
+
+          // calculate GTphat
+          /* TODO: figure out what Tphat actually is.*/
+
+          // calculate rhat_j'*Grhat_j
+          double rhatdotGrhat = 0;
+          for(m=0;m<2*ss+1;m++)
+            rhatdotGrhat += rhat[m][j] * Grhat[m];
+            
+          // calculate phat dot GTphat
+          double phatdotGTphat = 0;
+          for(m=0;m<2*ss+1;m++)
+            phatdotGTphat += phat[m][j] * GTphat[m];
+
           // calculate alpha
+          double alpha = rhatdotGrhat / phatdotGTphat;
+
           // xhat = xhat + alpha*phat
           PR_mult(domain,level,__Mp1,__Mp2,__Mp3,__Mr1,__Mr2,xhat,__temp); // temp = PR*xhat
           add_grids(domain,level,e_id,1.0,__e_id_old,1.0,__temp);            // e_id = e_id_old + PR*xhat

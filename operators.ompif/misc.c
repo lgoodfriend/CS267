@@ -235,7 +235,8 @@ void scale_grid(domain_type * domain, int level, int id_c, double scale_a, int i
 }
 
 
-void PR_mult(domain_type * domain, int level, int id_p1, int id_p2, int id_p3, int id_r1, int id_r2, double xhat[5], int id_t){ 
+// a = [P,R]*bhat
+void PR_mult(domain_type * domain, int level, int id_p1, int id_p2, int id_p3, int id_r1, int id_r2, double bhat[2*ss+1], int id_a){ 
   uint64_t _timeStart = CycleTime();
 
   int CollaborativeThreadingBoxSize = 100000; // i.e. never
@@ -261,17 +262,17 @@ void PR_mult(domain_type * domain, int level, int id_p1, int id_p2, int id_p3, i
     double * __restrict__ grid_p3 = domain->subdomains[box].levels[level].grids[id_p3];
     double * __restrict__ grid_r1 = domain->subdomains[box].levels[level].grids[id_r1];
     double * __restrict__ grid_r2 = domain->subdomains[box].levels[level].grids[id_r2];
-    double * __restrict__ grid_t  = domain->subdomains[box].levels[level].grids[id_t];
+    double * __restrict__ grid_a  = domain->subdomains[box].levels[level].grids[id_a];
     #pragma omp parallel for private(k,j,i) if(omp_within_a_box) collapse(2)
     for(k=0;k<dim_k;k++){
      for(j=0;j<dim_j;j++){
       for(i=0;i<dim_i;i++){
         int ijk = (i+ghosts) + (j+ghosts)*pencil + (k+ghosts)*plane;
-        grid_t[ijk] = xhat[0]*grid_p1[ijk] +
-                      xhat[1]*grid_p2[ijk] +
-                      xhat[2]*grid_p3[ijk] +
-                      xhat[3]*grid_r1[ijk] +
-                      xhat[4]*grid_r2[ijk];
+        grid_a[ijk] = bhat[0]*grid_p1[ijk] +
+                      bhat[1]*grid_p2[ijk] +
+                      bhat[2]*grid_p3[ijk] +
+                      bhat[3]*grid_r1[ijk] +
+                      bhat[4]*grid_r2[ijk];
     }}}
   }
   domain->cycles.blas1[level] += (uint64_t)(CycleTime()-_timeStart);

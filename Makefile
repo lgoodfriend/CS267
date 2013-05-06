@@ -31,7 +31,7 @@ test.hopper.ompif.cg: $(EXTRA) operators.ompif.c
 test.hopper.ompif.cacg: $(EXTRA) operators.ompif.c
 	cc -O0 -fno-alias -fno-fnalias -msse3 -openmp $(EXTRA) \
 		operators.ompif.c -traceback -check=stack,uninit \
-		-D__PRINT_NORM -D_MPI -D__PRINT_COMMUNICATION_BREAKDOWN -D__USE_CACG \
+		-D_MPI -D__PRINT_NORM -D__PRINT_COMMUNICATION_BREAKDOWN -D__USE_CACG \
 		-o $@ -g
 
 run.hopper.reference: $(EXTRA) operators.reference.c

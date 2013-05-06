@@ -720,8 +720,9 @@ void CycleMG(domain_type * domain, int e_id, int R_id, const double a, const dou
         double Tphat[2*ss+1] = {};
         double Grhat[2*ss+1] = {};
         double GTphat[2*ss+1] = {};
-        for(j=1;j <= ss;j++){                                            //   for{ s step
+        for(j=0;j < ss;j++){                                            //   for{ s step
           // calculate Tphat
+          /* !!!: Not sure if this is right.
           for(m=1; m<2*ss+1;m++){
             for(n=1;n<ss+1;n++){
               if((m==1)||(m==ss+2)){
@@ -731,6 +732,12 @@ void CycleMG(domain_type * domain, int e_id, int R_id, const double a, const dou
               }else{
                 Tphat[m][n] = phat[m+1][n];
               }}}
+          */
+          // calculate Tphat, only works for s=2 and is based on T in Erin_CACG.pdf
+          // NOTE: might be able to make a macro for generating based on general ss.
+          Tphat[1] = phat[1][j];
+          Tphat[2] = phat[2][j];
+          Tphat[5] = phat[4][j];
 
           // calculate Grhat
           for(m=0;m<2*ss+1;m++){
@@ -738,9 +745,10 @@ void CycleMG(domain_type * domain, int e_id, int R_id, const double a, const dou
               Grhat[m] += G[m][n]*rhat[n][j];
             }}
 
-
           // calculate GTphat
-          /* TODO: figure out what Tphat actually is.*/
+          for(m=0;m<2*ss+1;m++){
+            for(n=0;n<2*ss+1;n++){
+              GTphat[m] += G[m][n]*GTphat[n];
 
           // calculate rhat_j'*Grhat_j
           double rhatdotGrhat = 0;
@@ -758,12 +766,32 @@ void CycleMG(domain_type * domain, int e_id, int R_id, const double a, const dou
           // xhat = xhat + alpha*phat
           PR_mult(domain,level,__Mp1,__Mp2,__Mp3,__Mr1,__Mr2,xhat,__temp); // temp = PR*xhat
           add_grids(domain,level,e_id,1.0,__e_id_old,1.0,__temp);            // e_id = e_id_old + PR*xhat
+
           // rhat = rhat - alpha*Tphat
+          for (m=0;m<2*ss+1;m++)
+            rhat[m][j+1] = r[m][j+1] - alpha*Tphat[m];
+
           // r = PR*rhat //needs grid
+
           // calculate Grhat_new
+          double Grhat_new[2*ss+1] = {};
+          for(m=0;m<2*ss+1;m++){
+            for(n=0;n<2*ss+1;n++){
+              Grhat_new[m] += G[m][n]*rhat[n][j+1];
+            }}
+	  
           // calculate rhat_new dot Grhat_new
+          double rhat_newdotGrhat_new = 0;
+          for(m=0;m<2*ss+1;m++)
+            rhat_newdotGrhat_new += rhat[m][j+1]*Grhat_new[m];
+
           // calculate beta
+          double beta = rhat_newdotGrhat_new / rhatdotGrhat;
+
           // phat = rhat + beta*phat
+          for(m=0;m<2*ss+1;m++)
+            phat[m][j+1] = rhat[m] + beta*phat[m][j];
+          
           // p = PR*phat //needs grid  
         }
         k++;                                                            
@@ -842,3 +870,4 @@ void CycleMG(domain_type * domain, int e_id, int R_id, const double a, const dou
   } // numVCycles
 }
 //------------------------------------------------------------------------------------------------------------------------------
+// vim: sw=2 ts=2 expandtab

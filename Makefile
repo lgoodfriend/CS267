@@ -20,12 +20,12 @@ run.hopper.naive: $(EXTRA) operators.naive.c
 test.hopper.ompif.bicgstab: $(EXTRA) operators.ompif.c
 	cc -O3 -fno-alias -fno-fnalias -msse3 -openmp $(EXTRA) \
 		operators.ompif.c \
-		-D_MPI -D__PRINT_COMMUNICATION_BREAKDOWN -D__USE_BICGSTAB \
+		-D_MPI -D__PRINT_NORM -D__PRINT_COMMUNICATION_BREAKDOWN -D__USE_BICGSTAB \
 		-o $@ -g
 test.hopper.ompif.cg: $(EXTRA) operators.ompif.c
 	cc -O0 -fno-alias -fno-fnalias -check-pointers=write -msse3 -openmp $(EXTRA) \
 		operators.ompif.c -traceback -check=stack,uninit \
-		-D_MPI -D__PRINT_COMMUNICATION_BREAKDOWN -D__USE_CG \
+		-D_MPI -D__PRINT_NORM -D__PRINT_COMMUNICATION_BREAKDOWN -D__USE_CG \
 		-o $@ -g
 
 test.hopper.ompif.cacg: $(EXTRA) operators.ompif.c

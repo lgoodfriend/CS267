@@ -667,26 +667,23 @@ void CycleMG(domain_type * domain, int e_id, int R_id, const double a, const dou
       int k=0;
       double r_dot_r = dot(domain,level,__r,__r);			// r_dot_r = dot(r,r)
       do{								// do{
-        if (norm(domain, level, __r) < 0.00001) break ;                 //   check for convergence
-
-        /* TODO: adjust [rpx]hat so that they are laid out column-major */
         double phat[ss+1][2*ss+1] = {};                                 //   initialize phat
         phat[0][0] = 1.;
         double rhat[ss+1][2*ss+1] = {};                                 //   initialize rhat
-        rhat[0][ss] = 1.;
+        rhat[0][ss+1] = 1.;
         double xhat[ss+1][2*ss+1] = {};                                 //   initialize xhat
         // compute matrix powers kernel for p                           //   P = [Mp1 Mp2 Mp3]
         scale_grid(domain,level,__Mp1,1.0,__p);                         //   Mp1 = p
-        exchange_boundary(domain,level,__Mp1,1,0,0);			//   exchange_boundary(Mp1)
+        exchange_boundary(domain,level,__Mp1,1,0,0);                    //   exchange_boundary(Mp1)
         apply_op(domain,level,__Mp2,__Mp1,a,b,hLevel);                  //   Mp2 = Ap
-        exchange_boundary(domain,level,__Mp2,1,0,0);			//   exchange_boundary(Mp2)
+        exchange_boundary(domain,level,__Mp2,1,0,0);                    //   exchange_boundary(Mp2)
         apply_op(domain,level,__Mp3,__Mp2,a,b,hLevel);                  //   Mp3 = AAp
-        exchange_boundary(domain,level,__Mp3,1,0,0);			//   exchange_boundary(Mp3)
+        exchange_boundary(domain,level,__Mp3,1,0,0);                    //   exchange_boundary(Mp3)
         // compute matrix powers kernel for r                           //   R = [Mr1 Mr2]
         scale_grid(domain,level,__Mr1,1.0,__r);                         //   Mr1 = r
-        exchange_boundary(domain,level,__Mr1,1,0,0);			//   exchange_boundary(Mr1)
+        exchange_boundary(domain,level,__Mr1,1,0,0);                    //   exchange_boundary(Mr1)
         apply_op(domain,level,__Mr2,__Mr1,a,b,hLevel);                  //   Mr2 = Ar
-        exchange_boundary(domain,level,__Mr2,1,0,0);			//   exchange_boundary(Mr2)
+        exchange_boundary(domain,level,__Mr2,1,0,0);                    //   exchange_boundary(Mr2)
         // form Gram matrix
         double G[2*ss+1][2*ss+1] = {};                                  //   G = [P R]^T[P R] 
         G[0][0] = dot(domain,level,__Mp1,__Mp1);  
@@ -718,21 +715,12 @@ void CycleMG(domain_type * domain, int e_id, int R_id, const double a, const dou
         int j,m,n,o;
 
         for(j=0;j < ss;j++){                                            //   for s step
+          double tmp_norm = norm(domain, level, __r);
+          if (tmp_norm < 0.00001) break ;                 //   check for convergence
+
           double Tphat[2*ss+1] = {};
           double Grhat[2*ss+1] = {};
           double GTphat[2*ss+1] = {};
-          // calculate Tphat
-          /* !!!: Not sure if this is right.
-          for(m=1; m<2*ss+1;m++){
-            for(n=1;n<ss+1;n++){
-              if((m==1)||(m==ss+2)){
-                Tphat[m][n] = 0.;
-              }else if(m==ss+1){
-                Tphat[m][n] = phat[m][n];
-              }else{
-                Tphat[m][n] = phat[m+1][n];
-              }}}
-          */
           // calculate Tphat, only works for s=2 and is based on T in Erin_CACG.pdf
           // NOTE: might be able to make a macro for generating based on general ss.
           Tphat[1] = phat[j][0];

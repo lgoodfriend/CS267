@@ -61,12 +61,17 @@ void __box_initialize_rhs(box_type *box, int grid_id, double h){
     double y = h*(double)(j+box->low.j);
     double z = h*(double)(k+box->low.k);
     int ijk = (i+box->ghosts) + (j+box->ghosts)*box->pencil + (k+box->ghosts)*box->plane;
-    //double value = sin(twoPi*x)*sin(twoPi*y)*sin(twoPi*z);
+    double value = sin(twoPi*x)*sin(twoPi*y)*sin(twoPi*z);
+    /* XXX: This converges!
     if ((x>=0.25) && (x<0.75)){
       value = 1.0;
     }else{
       value = -1.0;
     }
+    */
+    /* XXX: This shouldn't converge!
+    value = rand()*2. - 1.;
+    */ 
     box->grids[grid_id][ijk] = value;
   }}}
 }

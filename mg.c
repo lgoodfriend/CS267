@@ -717,10 +717,10 @@ void CycleMG(domain_type * domain, int e_id, int R_id, const double a, const dou
         scale_grid(domain,level,__e_id_old,1.0,e_id);                   //   e_id_old = e_id                                            
         int j,m,n,o;
 
-        double Tphat[2*ss+1] = {};
-        double Grhat[2*ss+1] = {};
-        double GTphat[2*ss+1] = {};
         for(j=0;j < ss;j++){                                            //   for s step
+          double Tphat[2*ss+1] = {};
+          double Grhat[2*ss+1] = {};
+          double GTphat[2*ss+1] = {};
           // calculate Tphat
           /* !!!: Not sure if this is right.
           for(m=1; m<2*ss+1;m++){
@@ -748,7 +748,7 @@ void CycleMG(domain_type * domain, int e_id, int R_id, const double a, const dou
           // calculate GTphat
           for(m=0;m<2*ss+1;m++){
             for(n=0;n<2*ss+1;n++){
-              GTphat[m] += G[m][n]*GTphat[n];
+              GTphat[m] += G[m][n]*Tphat[n];
             }}
 
           // calculate rhat_j'*Grhat_j
@@ -773,10 +773,10 @@ void CycleMG(domain_type * domain, int e_id, int R_id, const double a, const dou
 
           // rhat = rhat - alpha*Tphat
           for (m=0;m<2*ss+1;m++)
-            rhat[j+1][m] = rhat[j+1][m] - alpha*Tphat[m];
+            rhat[j+1][m] = rhat[j][m] - alpha*Tphat[m];
 
           // r = PR*rhat //needs grid
-          PR_mult(domain,level,__Mp1,__Mp2,__Mp3,__Mr1,__Mr2,xhat[j],__r);
+          PR_mult(domain,level,__Mp1,__Mp2,__Mp3,__Mr1,__Mr2,rhat[j+1],__r);
 
           // calculate Grhat_new
           double Grhat_new[2*ss+1] = {};
@@ -795,10 +795,10 @@ void CycleMG(domain_type * domain, int e_id, int R_id, const double a, const dou
 
           // phat = rhat + beta*phat
           for(m=0;m<2*ss+1;m++)
-            phat[j+1][m] = rhat[j][m] + beta*phat[j][m];
+            phat[j+1][m] = rhat[j+1][m] + beta*phat[j][m];
           
           // p = PR*phat //needs grid  
-          PR_mult(domain,level,__Mp1,__Mp2,__Mp3,__Mr1,__Mr2,phat[j],__p);
+          PR_mult(domain,level,__Mp1,__Mp2,__Mp3,__Mr1,__Mr2,phat[j+1],__p);
         }
         k++;                                                            
       } while(k*ss<maxits);						// }while(ks<maxits);
@@ -826,7 +826,7 @@ void CycleMG(domain_type * domain, int e_id, int R_id, const double a, const dou
         r_dot_r = r_dot_r_new;					        //   r_dot_r = r_dot_r_new   (save old r_dot_r)
         j++;
         // FIX do convergence test (norm()) on r[] ?
-	if (norm(domain, level, __r) < 0.00001) break ;
+        if (norm(domain, level, __r) < 0.00001) break ;
       }while(j<jMax);							// }while(j<jMax);
     #else // just multiple GSRB's
       #warning Defaulting to simple GSRB bottom solver with fixed number of iterations...

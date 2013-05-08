@@ -43,7 +43,7 @@ int create_subdomain(subdomain_type * box, int subdomain_low_i, int subdomain_lo
     #elif defined  __USE_CG
     if(level == (numLevels-1))__numGrids+=6; // BiCGStab requires additional grids r0,r,p,s,Ap,As
     #elif defined  __USE_CACG
-    if(level == (numLevels-1))__numGrids+=12; // BiCGStab requires additional grids r0,r,p,s,Ap,As
+    if(level == (numLevels-1))__numGrids+=(7+__Mplen+__Mrlen); // BiCGStab requires additional grids r0,r,p,s,Ap,As
     #endif
     memory_allocated += create_box(&box->levels[level],__numGrids,subdomain_low_i>>level,subdomain_low_j>>level,subdomain_low_k>>level,
                                                                   subdomain_dim_i>>level,subdomain_dim_j>>level,subdomain_dim_k>>level,ghosts);
@@ -672,20 +672,49 @@ void CycleMG(domain_type * domain, int e_id, int R_id, const double a, const dou
         double rhat[ss+1][2*ss+1] = {};                                 //   initialize rhat
         rhat[0][ss+1] = 1.;
         double xhat[ss+1][2*ss+1] = {};                                 //   initialize xhat
-        // compute matrix powers kernel for p                           //   P = [Mp1 Mp2 Mp3]
-        scale_grid(domain,level,__Mp1,1.0,__p);                         //   Mp1 = p
+        int i,j,m,n,o;
+
+        // compute matrix powers kernel for p                           //   P = [Mp0 Mp1 Mp2]
+        for (i = __Mpstart; i < __Mpstart+__Mplen ; i++) {
+          if (i == __Mpstart) {
+            scale_grid(domain,level,i,1.0,__p);                         //   Mp0 = p
+            exchange_boundary(domain,level,i,1,0,0);                  //   exchange_boundary(Mp(i-1))
+          } else {
+            apply_op(domain,level,i,i-1,a,b,hLevel);                    //   Mpi = (A^i)p
+            exchange_boundary(domain,level,i,1,0,0);                  //   exchange_boundary(Mp(i-1))
+          }
+        }
+        /* XXX: for reference
         exchange_boundary(domain,level,__Mp1,1,0,0);                    //   exchange_boundary(Mp1)
         apply_op(domain,level,__Mp2,__Mp1,a,b,hLevel);                  //   Mp2 = Ap
         exchange_boundary(domain,level,__Mp2,1,0,0);                    //   exchange_boundary(Mp2)
         apply_op(domain,level,__Mp3,__Mp2,a,b,hLevel);                  //   Mp3 = AAp
         exchange_boundary(domain,level,__Mp3,1,0,0);                    //   exchange_boundary(Mp3)
-        // compute matrix powers kernel for r                           //   R = [Mr1 Mr2]
+        */
+
+        // compute matrix powers kernel for r                           //   R = [Mr0 Mr1]
+        for (i = __Mrstart; i < __Mrstart+__Mrlen ; i++) {
+          if (i == __Mrstart) {
+            scale_grid(domain,level,i,1.0,__r);                         //   Mr0 = r
+            exchange_boundary(domain,level,i,1,0,0);                  //   exchange_boundary(Mr(i-1))
+          } else {
+            apply_op(domain,level,i,i-1,a,b,hLevel);                    //   Mri = (A^i)r
+            exchange_boundary(domain,level,i,1,0,0);                  //   exchange_boundary(Mr(i-1))
+          }
+        }
+        /* XXX: for reference
         scale_grid(domain,level,__Mr1,1.0,__r);                         //   Mr1 = r
         exchange_boundary(domain,level,__Mr1,1,0,0);                    //   exchange_boundary(Mr1)
         apply_op(domain,level,__Mr2,__Mr1,a,b,hLevel);                  //   Mr2 = Ar
         exchange_boundary(domain,level,__Mr2,1,0,0);                    //   exchange_boundary(Mr2)
+        */
         // form Gram matrix
         double G[2*ss+1][2*ss+1] = {};                                  //   G = [P R]^T[P R] 
+        for (m = 0 ; m < 2*ss+1 ; m++) { //   XXX: Abusing grid indexing, be careful >.>;;
+          for (n = 0 ; n < 2*ss+1 ; n++) {
+            G[m][n] = dot(domain, level, __Mpstart+m,__Mpstart+n);
+          }}
+        /* XXX: For reference
         G[0][0] = dot(domain,level,__Mp1,__Mp1);  
         G[0][1] = dot(domain,level,__Mp1,__Mp2);  
         G[0][2] = dot(domain,level,__Mp1,__Mp3);  
@@ -711,11 +740,11 @@ void CycleMG(domain_type * domain, int e_id, int R_id, const double a, const dou
         G[4][2] = dot(domain,level,__Mr2,__Mp3);  
         G[4][3] = dot(domain,level,__Mr2,__Mr1);  
         G[4][4] = dot(domain,level,__Mr2,__Mr2);  
+        */
         scale_grid(domain,level,__e_id_old,1.0,e_id);                   //   e_id_old = e_id                                            
-        int j,m,n,o;
-
         for(j=0;j < ss;j++){                                            //   for s step
           double tmp_norm = norm(domain, level, __r);
+          // printf("s-step=%2d, norm=%0.20f\n",j+1,tmp_norm);
           if (tmp_norm < 0.00001) break ;                 //   check for convergence
 
           double Tphat[2*ss+1] = {};
@@ -723,9 +752,19 @@ void CycleMG(domain_type * domain, int e_id, int R_id, const double a, const dou
           double GTphat[2*ss+1] = {};
           // calculate Tphat, only works for s=2 and is based on T in Erin_CACG.pdf
           // NOTE: might be able to make a macro for generating based on general ss.
+          /* XXX: For reference
           Tphat[1] = phat[j][0];
           Tphat[2] = phat[j][1];
           Tphat[4] = phat[j][3];
+          */
+          // Calculate Tphat
+          for (i=0 ; i < 2*ss+1; i++) {
+            if (i==0 || i == s) {
+              Tphat[i] = 0;
+            } else {
+              Tphat[i] = phat[j][i-1];
+            }
+          }
 
           // calculate Grhat
           for(m=0;m<2*ss+1;m++){
@@ -756,7 +795,7 @@ void CycleMG(domain_type * domain, int e_id, int R_id, const double a, const dou
           for (m=0;m<2*ss+1;m++)
             xhat[j+1][m] = xhat[j][m] + alpha*phat[j][m];
 
-          PR_mult(domain,level,__Mp1,__Mp2,__Mp3,__Mr1,__Mr2,xhat[j+1],__temp); // temp = PR*xhat
+          PR_mult(domain,level,__Mpstart,__Mplen+__Mrlen,xhat[j+1],__temp); // temp = PR*xhat
           add_grids(domain,level,e_id,1.0,__e_id_old,1.0,__temp);            // e_id = e_id_old + PR*xhat
 
           // rhat = rhat - alpha*Tphat
@@ -764,7 +803,7 @@ void CycleMG(domain_type * domain, int e_id, int R_id, const double a, const dou
             rhat[j+1][m] = rhat[j][m] - alpha*Tphat[m];
 
           // r = PR*rhat //needs grid
-          PR_mult(domain,level,__Mp1,__Mp2,__Mp3,__Mr1,__Mr2,rhat[j+1],__r);
+          PR_mult(domain,level,__Mpstart,__Mplen+__Mrlen,rhat[j+1],__r);
 
           // calculate Grhat_new
           double Grhat_new[2*ss+1] = {};
@@ -786,7 +825,7 @@ void CycleMG(domain_type * domain, int e_id, int R_id, const double a, const dou
             phat[j+1][m] = rhat[j+1][m] + beta*phat[j][m];
           
           // p = PR*phat //needs grid  
-          PR_mult(domain,level,__Mp1,__Mp2,__Mp3,__Mr1,__Mr2,phat[j+1],__p);
+          PR_mult(domain,level,__Mpstart,__Mplen+__Mrlen,phat[j+1],__p);
         }
         k++;                                                            
       } while(k*ss<maxits);						// }while(ks<maxits);

@@ -24,13 +24,19 @@
 #define  __Ap         14
 #define  __As         15
 // For CACG
-#define __Mp1         16
-#define __Mp2         17
-#define __Mp3         18
-#define __Mr1         19
-#define __Mr2         20
-#define __e_id_old    21
-#define ss             2 // number of s steps to do
+#define ss            2
+#define __e_id_old    16
+#define __Mpstart     17
+#define __Mplen       ss+1
+#define __Mrstart     __Mpstart+__Mplen
+#define __Mrlen       ss
+/* For reference
+#define __Mp1         17
+#define __Mp2         18
+#define __Mp3         19
+#define __Mr1         20
+#define __Mr2         21
+*/
 
 
 //------------------------------------------------------------------------------------------------------------------------------

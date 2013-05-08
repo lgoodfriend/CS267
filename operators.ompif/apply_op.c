@@ -3,8 +3,9 @@
 // SWWilliams@lbl.gov
 // Lawrence Berkeley National Lab
 //------------------------------------------------------------------------------------------------------------------------------
-void apply_op(domain_type * domain, int level, int Ax_id, int x_id, double a, double b, double h){  // y= Ax
+void apply_op(domain_type * domain, int level, int Ax_id, int x_id, double a, double b, double h, int deep ){  // y= Ax
   int CollaborativeThreadingBoxSize = 100000; // i.e. never
+  //int deep = 1;
   #ifdef __COLLABORATIVE_THREADING
     //#warning using Collaborative Threading for large boxes in ApplyOp()
     CollaborativeThreadingBoxSize = 1 << __COLLABORATIVE_THREADING;
@@ -31,9 +32,9 @@ void apply_op(domain_type * domain, int level, int Ax_id, int x_id, double a, do
     double * __restrict__ beta_k = domain->subdomains[box].levels[level].grids[ __beta_k] + ghosts*plane + ghosts*pencil + ghosts;
 
     #pragma omp parallel for private(k,j,i) if(omp_within_a_box) collapse(2)
-    for(k=0;k<dim_k;k++){
-    for(j=0;j<dim_j;j++){
-    for(i=0;i<dim_i;i++){
+    for(k=0-deep;k<dim_k+deep;k++){
+    for(j=0-deep;j<dim_j+deep;j++){
+    for(i=0-deep;i<dim_i+deep;i++){
       int ijk = i + j*pencil + k*plane;
       double helmholtz =  a*alpha[ijk]*x[ijk]
                          -b*h2inv*(

@@ -3,7 +3,7 @@
 // SWWilliams@lbl.gov
 // Lawrence Berkeley National Lab
 //------------------------------------------------------------------------------------------------------------------------------
-  void                  apply_op(domain_type *domain, int level, int Ax_id, int x_id, double a, double b, double hLevel);
+void                  apply_op(domain_type *domain, int level, int Ax_id, int x_id, double a, double b, double hLevel, int deep);
   void                    smooth(domain_type *domain, int level, int phi_id, int rhs_id, double a, double b, double hLevel, int sweep);
   void                  residual(domain_type *domain, int level, int res_id, int phi_id, int rhs_id, double a, double b, double hLevel);
   void             interpolation(domain_type *domain, int level_c, int id_c, int level_f, int id_f);

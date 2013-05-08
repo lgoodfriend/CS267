@@ -632,13 +632,13 @@ void CycleMG(domain_type * domain, int e_id, int R_id, const double a, const dou
       double r_dot_r = r_dot_r0;
       do{								// do{
         exchange_boundary(domain,level,__p,1,0,0);			//   exchange_boundary(p)
-        apply_op(domain,level,__Ap,__p,a,b,hLevel);			//   Ap = A(p)
+        apply_op(domain,level,__Ap,__p,a,b,hLevel,0);			//   Ap = A(p)
         double Ap_dot_r0 = dot(domain,level,__Ap,__r0);			//   Ap_dot_r0 = dot(Ap,r0)
         // what if Ap_dot_r0 == 0 (pivot breakdown) ???
         double alpha = r_dot_r0 / Ap_dot_r0;				//   alpha = r_dot_r0 / Ap_dot_r0
         add_grids(domain,level,__s,1.0,__r,-alpha,__Ap);		//   s[] = r[] - alpha*Ap[]
         exchange_boundary(domain,level,__s,1,0,0);			//   exchange_boundary(s)
-        apply_op(domain,level,__As,__s,a,b,hLevel);			//   As = A(s)
+        apply_op(domain,level,__As,__s,a,b,hLevel,0);			//   As = A(s)
         double As_dot_s  = dot(domain,level,__As, __s);			//   As_dot_s  = dot(As, s)
         double As_dot_As = dot(domain,level,__As,__As);			//   As_dot_As = dot(As,As)
         double omega = As_dot_s / As_dot_As;				//   omega = As_dot_s / As_dot_As
@@ -675,14 +675,14 @@ void CycleMG(domain_type * domain, int e_id, int R_id, const double a, const dou
         // compute matrix powers kernel for p                           //   P = [Mp1 Mp2 Mp3]
         scale_grid(domain,level,__Mp1,1.0,__p);                         //   Mp1 = p
         exchange_boundary(domain,level,__Mp1,1,0,0);                    //   exchange_boundary(Mp1)
-        apply_op(domain,level,__Mp2,__Mp1,a,b,hLevel);                  //   Mp2 = Ap
-        exchange_boundary(domain,level,__Mp2,1,0,0);                    //   exchange_boundary(Mp2)
-        apply_op(domain,level,__Mp3,__Mp2,a,b,hLevel);                  //   Mp3 = AAp
+        apply_op(domain,level,__Mp2,__Mp1,a,b,hLevel,1);                  //   Mp2 = Ap
+        //exchange_boundary(domain,level,__Mp2,1,0,0);                    //   exchange_boundary(Mp2)
+        apply_op(domain,level,__Mp3,__Mp2,a,b,hLevel,0);                  //   Mp3 = AAp
         exchange_boundary(domain,level,__Mp3,1,0,0);                    //   exchange_boundary(Mp3)
         // compute matrix powers kernel for r                           //   R = [Mr1 Mr2]
         scale_grid(domain,level,__Mr1,1.0,__r);                         //   Mr1 = r
         exchange_boundary(domain,level,__Mr1,1,0,0);                    //   exchange_boundary(Mr1)
-        apply_op(domain,level,__Mr2,__Mr1,a,b,hLevel);                  //   Mr2 = Ar
+        apply_op(domain,level,__Mr2,__Mr1,a,b,hLevel,0);                  //   Mr2 = Ar
         exchange_boundary(domain,level,__Mr2,1,0,0);                    //   exchange_boundary(Mr2)
         // form Gram matrix
         double G[2*ss+1][2*ss+1] = {};                                  //   G = [P R]^T[P R] 
@@ -803,7 +803,7 @@ void CycleMG(domain_type * domain, int e_id, int R_id, const double a, const dou
       double r_dot_r = dot(domain,level,__r,__r);			// r_dot_r = dot(r,r)
       do{								// do{
         exchange_boundary(domain,level,__p,1,0,0);			//   exchange_boundary(p)
-        apply_op(domain,level,__Ap,__p,a,b,hLevel);			//   Ap = A(p)
+        apply_op(domain,level,__Ap,__p,a,b,hLevel,0);			//   Ap = A(p)
         double Ap_dot_p = dot(domain, level, __Ap, __p);                //   Ap_dot_p = dot(Ap,p)
         double alpha = r_dot_r / Ap_dot_p;				//   alpha = r_dot_r / Ap_dot_p
         add_grids(domain,level,  e_id,  1.0,e_id,   alpha,__p);	        //   e_id[] = e_id[] + alpha*p[]

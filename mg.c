@@ -709,10 +709,10 @@ void CycleMG(domain_type * domain, int e_id, int R_id, const double a, const dou
         // compute matrix powers kernel for r                                 // R = [Mr0..Mr(ss-1)]
         for (i = 0; i < __Mrlen ; i++) {
           if (i == 0) {
-            scale_grid(domain,level,i+__Mpstart,1.0,__r);                     // Mr0 = r
-            exchange_boundary(domain,level,i+__Mpstart,1,0,0);                // exchange_boundary(Mr(i-1))
+            scale_grid(domain,level,i+__Mrstart,1.0,__r);                     // Mr0 = r
+            exchange_boundary(domain,level,i+__Mrstart,1,0,0);                // exchange_boundary(Mr(i-1))
           } else {
-            apply_op(domain,level,i+__Mpstart,i+__Mpstart-1,a,b,hLevel,ss-i); // Mri = (A^i)r
+            apply_op(domain,level,i+__Mrstart,i+__Mrstart-1,a,b,hLevel,ss-i); // Mri = (A^i)r
           }
         }
 

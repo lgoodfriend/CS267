@@ -79,15 +79,15 @@ typedef struct {
  int create_subdomain(subdomain_type * box, 
                       int subdomain_low_i, int subdomain_low_j, int subdomain_low_k,
                       int subdomain_dim_i, int subdomain_dim_j, int subdomain_dim_k,
-                      int numGrids, int ghosts, int numLevels);
+                      int numGrids, int ghosts, int numLevels, int ss);
 void destroy_domain(domain_type * domain);
  int create_domain(domain_type * domain,
                    int subdomain_dim_i, int subdomain_dim_j, int subdomain_dim_k,
                    int subdomains_per_rank_in_i, int subdomains_per_rank_in_j, int subdomains_per_rank_in_k,
                    int ranks_in_i, int ranks_in_j, int ranks_in_k,
-                   int rank, int numGrids, int ghosts, int numLevels);
+                   int rank, int numGrids, int ghosts, int numLevels, int ss);
 void MGBuild(domain_type * domain);
-void MGSolve(domain_type * domain, int e0_id, int R0_id, int homogeneous, double a, double b, double h0);
-void CycleMG(domain_type * domain, int e_id, int R_id, double a, double b, double h0);
+void MGSolve(domain_type * domain, int e0_id, int R0_id, int homogeneous, double a, double b, double h0, int ss);
+void CycleMG(domain_type * domain, int e_id, int R_id, double a, double b, double h0, int ss);
 void print_timing(domain_type *domain);
 //------------------------------------------------------------------------------------------------------------------------------

@@ -157,6 +157,7 @@ int main(int argc, char **argv){
   int ranks_in_i=1;
   int ranks_in_j=1;
   int ranks_in_k=1;
+  int ss=1;
 
   if(argc==2){
           log2_subdomain_dim=atoi(argv[1]);
@@ -176,8 +177,17 @@ int main(int argc, char **argv){
                   ranks_in_i=atoi(argv[5]);
                   ranks_in_j=atoi(argv[6]);
                   ranks_in_k=atoi(argv[7]);
+  }else if(argc == 9){
+          log2_subdomain_dim=atoi(argv[1]);
+    subdomains_per_rank_in_i=atoi(argv[2]);
+    subdomains_per_rank_in_j=atoi(argv[3]);
+    subdomains_per_rank_in_k=atoi(argv[4]);
+                  ranks_in_i=atoi(argv[5]);
+                  ranks_in_j=atoi(argv[6]);
+                  ranks_in_k=atoi(argv[7]);
+		          ss=atoi(argv[8]);
   }else if(argc!=1){
-    if(MPI_Rank==0){printf("usage: ./a.out [log2_subdomain_dim]   [subdomains per rank in i,j,k]  [ranks in i,j,k]\n");}
+    if(MPI_Rank==0){printf("usage: ./a.out [log2_subdomain_dim]   [subdomains per rank in i,j,k]  [ranks in i,j,k] [num of s steps]\n");}
     #ifdef _MPI
     MPI_Finalize();
     #endif
@@ -216,11 +226,11 @@ int main(int argc, char **argv){
   create_domain(&domain_1 ,subdomain_dim_i,subdomain_dim_j,subdomain_dim_k,
                               subdomains_per_rank_in_i,subdomains_per_rank_in_j,subdomains_per_rank_in_k,
                               ranks_in_i,ranks_in_j,ranks_in_k,
-                              MPI_Rank,10,1,levels_in_vcycle);
+                              MPI_Rank,10,1,levels_in_vcycle,ss);
   create_domain(&domain_CA,subdomain_dim_i,subdomain_dim_j,subdomain_dim_k,
                               subdomains_per_rank_in_i,subdomains_per_rank_in_j,subdomains_per_rank_in_k,
                               ranks_in_i,ranks_in_j,ranks_in_k,
-                              MPI_Rank,10,4,levels_in_vcycle);
+                              MPI_Rank,11,ss,levels_in_vcycle,ss);
   //- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
   double  a=0.0;
   double  b=-1.0;
@@ -253,8 +263,8 @@ int main(int argc, char **argv){
   #ifdef _MPI
   sMax=4;
   #endif
-  for(s=0;s<sMax;s++)MGSolve(&domain_1 ,__u,__f,1,a,b,h0);
-  for(s=0;s<sMax;s++)MGSolve(&domain_CA,__u,__f,1,a,b,h0);
+  for(s=0;s<sMax;s++)MGSolve(&domain_1 ,__u,__f,1,a,b,h0,ss);
+  for(s=0;s<sMax;s++)MGSolve(&domain_CA,__u,__f,1,a,b,h0,ss);
   //- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
   // verification....
   //- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 

@@ -236,7 +236,7 @@ void scale_grid(domain_type * domain, int level, int id_c, double scale_a, int i
 
 
 // a = [P,R]*bhat
-void PR_mult(domain_type * domain, int level, int id_pstart, int pr_len, double bhat[2*ss+1], int id_a){ 
+void PR_mult(domain_type * domain, int level, int id_pstart, int pr_len, double *bhat, int id_a){ 
   uint64_t _timeStart = CycleTime();
 
   int CollaborativeThreadingBoxSize = 100000; // i.e. never

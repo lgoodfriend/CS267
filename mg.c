@@ -23,7 +23,7 @@
 //------------------------------------------------------------------------------------------------------------------------------
 int create_subdomain(subdomain_type * box, int subdomain_low_i, int subdomain_low_j, int subdomain_low_k,  
                                        int subdomain_dim_i, int subdomain_dim_j, int subdomain_dim_k, 
-                                       int numGrids, int ghosts, int numLevels){
+                                       int numGrids, int ghosts, int numLevels, int ss){
   int level;
   uint64_t memory_allocated=0;
   box->numLevels=numLevels;
@@ -43,6 +43,11 @@ int create_subdomain(subdomain_type * box, int subdomain_low_i, int subdomain_lo
     #elif defined  __USE_CG
     if(level == (numLevels-1))__numGrids+=6; // BiCGStab requires additional grids r0,r,p,s,Ap,As
     #elif defined  __USE_CACG
+    int __Mpstart,__Mrstart,__Mplen,__Mrlen;
+    __Mpstart =  17;
+    __Mplen = ss+1;
+    __Mrstart = __Mpstart+__Mplen;
+    __Mrlen = ss;
     if(level == (numLevels-1))__numGrids+=(7+__Mplen+__Mrlen); // BiCGStab requires additional grids r0,r,p,s,Ap,As
     #endif
     memory_allocated += create_box(&box->levels[level],__numGrids,subdomain_low_i>>level,subdomain_low_j>>level,subdomain_low_k>>level,
@@ -111,7 +116,7 @@ int create_domain(domain_type * domain,
               int subdomains_per_rank_in_i, int subdomains_per_rank_in_j, int subdomains_per_rank_in_k, 
               int ranks_in_i,      int ranks_in_j,      int ranks_in_k, 
               int rank,
-              int numGrids, int ghosts, int numLevels
+              int numGrids, int ghosts, int numLevels, int ss
              ){
   int  i, j, k;
   int di,dj,dk;
@@ -169,7 +174,7 @@ int create_domain(domain_type * domain,
     memory_allocated += create_subdomain(&domain->subdomains[box],low_i,low_j,low_k,
                                          //(i+subdomains_per_rank_in_i)*subdomain_dim_i,(j+subdomains_per_rank_in_j)*subdomain_dim_j,(k+subdomains_per_rank_in_k)*subdomain_dim_k,
                                             subdomain_dim_i,                             subdomain_dim_j,                             subdomain_dim_k,
-                                            numGrids,ghosts,numLevels);
+                                            numGrids,ghosts,numLevels, ss);
     for(dk=-1;dk<=1;dk++){
     for(dj=-1;dj<=1;dj++){
     for(di=-1;di<=1;di++){
@@ -501,7 +506,7 @@ void MGBuild(domain_type * domain){
 
 
 //------------------------------------------------------------------------------------------------------------------------------
-void MGSolve(domain_type * domain, int e0_id, int R0_id, int homogeneous, double a, double b, double h0){ 
+void MGSolve(domain_type * domain, int e0_id, int R0_id, int homogeneous, double a, double b, double h0, int ss){ 
   // NOTE: you must have previously called MGBuild in order to guarantee all restrictions of alpha and beta have been formed and communicated
   int level,box;
   int numLevels  = domain->numLevels;
@@ -553,7 +558,7 @@ void MGSolve(domain_type * domain, int e0_id, int R0_id, int homogeneous, double
   //- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
   if(homogeneous){
     uint64_t _timeStartVCycle = CycleTime();
-    CycleMG(domain,e0_id,R0_id,a,b,h0);
+    CycleMG(domain,e0_id,R0_id,a,b,h0,ss);
     domain->cycles.vcycles += (uint64_t)(CycleTime()-_timeStartVCycle);
   }else{
     // calculate temporary RHS = residual = f-Av ...
@@ -561,7 +566,7 @@ void MGSolve(domain_type * domain, int e0_id, int R0_id, int homogeneous, double
     residual(domain,0,__f_minus_Av,e0_id,R0_id,a,b,h0); // rhs = f-Av
     zero_grid(domain,0,__ee);                  // ee = 0
     uint64_t _timeStartVCycle = CycleTime();
-    CycleMG(domain,__ee,__f_minus_Av,a,b,h0);           // calculate the correction(ee)
+    CycleMG(domain,__ee,__f_minus_Av,a,b,h0,ss);           // calculate the correction(ee)
     domain->cycles.vcycles += (uint64_t)(CycleTime()-_timeStartVCycle);
     add_grids(domain,0,e0_id,1.0,e0_id,1.0,__ee); // apply the correction(ee) to e0
   }
@@ -572,7 +577,7 @@ void MGSolve(domain_type * domain, int e0_id, int R0_id, int homogeneous, double
 }
 
 //------------------------------------------------------------------------------------------------------------------------------
-void CycleMG(domain_type * domain, int e_id, int R_id, const double a, const double b, const double h0){
+void CycleMG(domain_type * domain, int e_id, int R_id, const double a, const double b, const double h0, int ss){
   int level,box;
   //int SwitchToInterBoxParallelismAtLevel = 1;
   int numVCycles       = 10;
@@ -660,175 +665,158 @@ void CycleMG(domain_type * domain, int e_id, int R_id, const double a, const dou
     #elif defined __USE_CACG
       #warning Using Communication Avoiding Conjugate Gradient Solver with fixed number of iterations...
       const int maxits=10;
-      if(level>0)zero_grid(domain,level,e_id);				// e_id[] = 0
-      exchange_boundary(domain,level,e_id,1,0,0);			// exchange_boundary(e_id)
-      residual(domain,level,__r,e_id,R_id,a,b,hLevel);			// r[] = R_id[] - A(e_id)
-      scale_grid(domain,level,__p,1.0,__r);				// p[] = r[]
+      int __Mpstart,__Mrstart,__Mplen,__Mrlen;
+      __Mpstart = 17; // For start offset check defines.h
+      __Mplen = ss+1;
+      __Mrstart = __Mpstart+__Mplen;
+      __Mrlen = ss;
+      double *Tphat = malloc(sizeof(double)*(2*ss+1));
+      double *Grhat = malloc(sizeof(double)*(2*ss+1));
+      double *GTphat = malloc(sizeof(double)*(2*ss+1));
+      double *Grhat_new = malloc(sizeof(double)*(2*ss+1));
+      double *phat = malloc(sizeof(double)*(2*ss+1));                         // phat
+      double *rhat = malloc(sizeof(double)*(2*ss+1));                         // rhat
+      double *xhat = malloc(sizeof(double)*(2*ss+1));                         // xhat
+      double *xhat_next = malloc(sizeof(double)*(2*ss+1));                    // xhat_next
+      double *G = malloc(sizeof(double)*(2*ss+1)*(2*ss+1));                   // G = [P R]^T[P R] 
+      double *tmp = NULL;
+
+      if(level>0)zero_grid(domain,level,e_id);				                        // e_id[] = 0
+      exchange_boundary(domain,level,e_id,1,0,0);			                        // exchange_boundary(e_id)
+      residual(domain,level,__r,e_id,R_id,a,b,hLevel);			                  // r[] = R_id[] - A(e_id)
+      scale_grid(domain,level,__p,1.0,__r);				                            // p[] = r[]
       int k=0;
-      double r_dot_r = dot(domain,level,__r,__r);			// r_dot_r = dot(r,r)
-      do{								// do{
-        double phat[ss+1][2*ss+1] = {};                                 //   initialize phat
-        phat[0][0] = 1.;
-        double rhat[ss+1][2*ss+1] = {};                                 //   initialize rhat
-        rhat[0][ss+1] = 1.;
-        double xhat[ss+1][2*ss+1] = {};                                 //   initialize xhat
+      double r_dot_r = dot(domain,level,__r,__r);			                        // r_dot_r = r*r
+      do{								                                                      // do{
+        memset(phat, 0, sizeof(double)*(2*ss+1));                             // initialize phat
+        phat[0] = 1.;
+        memset(rhat, 0, sizeof(double)*(2*ss+1));                             // initialize rhat
+        rhat[ss+1] = 1.;
+        memset(xhat, 0, sizeof(double)*(2*ss+1));                             // initialize xhat
+        memset(xhat_next, 0, sizeof(double)*(2*ss+1));                        // initialize xhat_next
         int i,j,m,n,o;
 
-        // compute matrix powers kernel for p                           //   P = [Mp0 Mp1 Mp2]
-        for (i = __Mpstart; i < __Mpstart+__Mplen ; i++) {
-          if (i == __Mpstart) {
-            scale_grid(domain,level,i,1.0,__p);                         //   Mp0 = p
-            exchange_boundary(domain,level,i,1,0,0);                  //   exchange_boundary(Mp(i-1))
+        // compute matrix powers kernel for p                                 // P = [Mp0..Mp(ss)]
+        for (i = 0; i < __Mplen ; i++) {
+          if (i == 0) {
+            scale_grid(domain,level,i+__Mpstart,1.0,__p);                     // Mp0 = p
+            exchange_boundary(domain,level,i+__Mpstart,1,0,0);                // exchange_boundary(Mp(i-1))
           } else {
-            apply_op(domain,level,i,i-1,a,b,hLevel);                    //   Mpi = (A^i)p
-            exchange_boundary(domain,level,i,1,0,0);                  //   exchange_boundary(Mp(i-1))
+            apply_op(domain,level,i+__Mpstart,i+__Mpstart-1,a,b,hLevel,ss-i); // Mpi = (A^i)p
           }
         }
-        /* XXX: for reference
-        exchange_boundary(domain,level,__Mp1,1,0,0);                    //   exchange_boundary(Mp1)
-        apply_op(domain,level,__Mp2,__Mp1,a,b,hLevel,1);                  //   Mp2 = Ap
-        //exchange_boundary(domain,level,__Mp2,1,0,0);                    //   exchange_boundary(Mp2)
-        apply_op(domain,level,__Mp3,__Mp2,a,b,hLevel,0);                  //   Mp3 = AAp
-        exchange_boundary(domain,level,__Mp3,1,0,0);                    //   exchange_boundary(Mp3)
-        */
 
-        // compute matrix powers kernel for r                           //   R = [Mr0 Mr1]
-        for (i = __Mrstart; i < __Mrstart+__Mrlen ; i++) {
-          if (i == __Mrstart) {
-            scale_grid(domain,level,i,1.0,__r);                         //   Mr0 = r
-            exchange_boundary(domain,level,i,1,0,0);                  //   exchange_boundary(Mr(i-1))
+        // compute matrix powers kernel for r                                 // R = [Mr0..Mr(ss-1)]
+        for (i = 0; i < __Mrlen ; i++) {
+          if (i == 0) {
+            scale_grid(domain,level,i+__Mpstart,1.0,__r);                     // Mr0 = r
+            exchange_boundary(domain,level,i+__Mpstart,1,0,0);                // exchange_boundary(Mr(i-1))
           } else {
-            apply_op(domain,level,i,i-1,a,b,hLevel);                    //   Mri = (A^i)r
-            exchange_boundary(domain,level,i,1,0,0);                  //   exchange_boundary(Mr(i-1))
+            apply_op(domain,level,i+__Mpstart,i+__Mpstart-1,a,b,hLevel,ss-i); // Mri = (A^i)r
           }
         }
-        /* XXX: for reference
-        scale_grid(domain,level,__Mr1,1.0,__r);                         //   Mr1 = r
-        exchange_boundary(domain,level,__Mr1,1,0,0);                    //   exchange_boundary(Mr1)
-        apply_op(domain,level,__Mr2,__Mr1,a,b,hLevel,0);                  //   Mr2 = Ar
-        exchange_boundary(domain,level,__Mr2,1,0,0);                    //   exchange_boundary(Mr2)
-        */
-        // form Gram matrix
-        double G[2*ss+1][2*ss+1] = {};                                  //   G = [P R]^T[P R] 
+
+        // form Gram matrix                                                   // G = [P,R]'*[P,R]
         for (m = 0 ; m < 2*ss+1 ; m++) { //   XXX: Abusing grid indexing, be careful >.>;;
           for (n = 0 ; n < 2*ss+1 ; n++) {
-            G[m][n] = dot(domain, level, __Mpstart+m,__Mpstart+n);
+            G[m*(2*ss+1)+n] = dot(domain, level, __Mpstart+m,__Mpstart+n);
           }}
-        /* XXX: For reference
-        G[0][0] = dot(domain,level,__Mp1,__Mp1);  
-        G[0][1] = dot(domain,level,__Mp1,__Mp2);  
-        G[0][2] = dot(domain,level,__Mp1,__Mp3);  
-        G[0][3] = dot(domain,level,__Mp1,__Mr1);  
-        G[0][4] = dot(domain,level,__Mp1,__Mr2);  
-        G[1][0] = dot(domain,level,__Mp2,__Mp1);  
-        G[1][1] = dot(domain,level,__Mp2,__Mp2);  
-        G[1][2] = dot(domain,level,__Mp2,__Mp3);  
-        G[1][3] = dot(domain,level,__Mp2,__Mr1);  
-        G[1][4] = dot(domain,level,__Mp2,__Mr2);  
-        G[2][0] = dot(domain,level,__Mp3,__Mp1);  
-        G[2][1] = dot(domain,level,__Mp3,__Mp2);  
-        G[2][2] = dot(domain,level,__Mp3,__Mp3);  
-        G[2][3] = dot(domain,level,__Mp3,__Mr1);  
-        G[2][4] = dot(domain,level,__Mp3,__Mr2);  
-        G[3][0] = dot(domain,level,__Mr1,__Mp1);  
-        G[3][1] = dot(domain,level,__Mr1,__Mp2);  
-        G[3][2] = dot(domain,level,__Mr1,__Mp3);  
-        G[3][3] = dot(domain,level,__Mr1,__Mr1);  
-        G[3][4] = dot(domain,level,__Mr1,__Mr2);  
-        G[4][0] = dot(domain,level,__Mr2,__Mp1);  
-        G[4][1] = dot(domain,level,__Mr2,__Mp2);  
-        G[4][2] = dot(domain,level,__Mr2,__Mp3);  
-        G[4][3] = dot(domain,level,__Mr2,__Mr1);  
-        G[4][4] = dot(domain,level,__Mr2,__Mr2);  
-        */
-        scale_grid(domain,level,__e_id_old,1.0,e_id);                   //   e_id_old = e_id                                            
-        for(j=0;j < ss;j++){                                            //   for s step
+        scale_grid(domain,level,__e_id_old,1.0,e_id);                         //   e_id_old = e_id                                            
+
+        // START S-STEPS:
+        for(j=0;j < ss;j++){                                                  //   for s step
           double tmp_norm = norm(domain, level, __r);
           // printf("s-step=%2d, norm=%0.20f\n",j+1,tmp_norm);
-          if (tmp_norm < 0.00001) break ;                 //   check for convergence
+          if (tmp_norm < 0.00001) break ;                                     //   check for convergence
+          
+          // Need to make current xhat the xhat_next from last time...
+          tmp = xhat;
+          xhat = xhat_next;
+          xhat_next = tmp;
+          memset(xhat_next, 0, sizeof(double)*(2*ss+1));                      // reset xhat_next
 
-          double Tphat[2*ss+1] = {};
-          double Grhat[2*ss+1] = {};
-          double GTphat[2*ss+1] = {};
-          // calculate Tphat, only works for s=2 and is based on T in Erin_CACG.pdf
-          // NOTE: might be able to make a macro for generating based on general ss.
-          /* XXX: For reference
-          Tphat[1] = phat[j][0];
-          Tphat[2] = phat[j][1];
-          Tphat[4] = phat[j][3];
-          */
           // Calculate Tphat
           for (i=0 ; i < 2*ss+1; i++) {
             if (i==0 || i == s) {
               Tphat[i] = 0;
             } else {
-              Tphat[i] = phat[j][i-1];
+              Tphat[i] = phat[i-1];
             }
           }
 
           // calculate Grhat
+          memset(Grhat, 0, sizeof(double)*(2*ss+1));                        // reset Grhat
           for(m=0;m<2*ss+1;m++){
             for(n=0;n<2*ss+1;n++){
-              Grhat[m] += G[m][n]*rhat[j][n];
+              Grhat[m] += G[m*(2*ss+1)+n]*rhat[n];
             }}
 
           // calculate GTphat
+          memset(GTphat, 0, sizeof(double)*(2*ss+1));                        // reset GTphat
           for(m=0;m<2*ss+1;m++){
             for(n=0;n<2*ss+1;n++){
-              GTphat[m] += G[m][n]*Tphat[n];
+              GTphat[m] += G[m*(2*ss+1)+n]*Tphat[n];
             }}
 
           // calculate rhat_j'*Grhat_j
           double rhatdotGrhat = 0;
           for(m=0;m<2*ss+1;m++)
-            rhatdotGrhat += rhat[j][m] * Grhat[m];
+            rhatdotGrhat += rhat[m] * Grhat[m];
             
           // calculate phat dot GTphat
           double phatdotGTphat = 0;
           for(m=0;m<2*ss+1;m++)
-            phatdotGTphat += phat[j][m] * GTphat[m];
+            phatdotGTphat += phat[m] * GTphat[m];
 
           // calculate alpha
           double alpha = rhatdotGrhat / phatdotGTphat;
 
           // xhat = xhat + alpha*phat
           for (m=0;m<2*ss+1;m++)
-            xhat[j+1][m] = xhat[j][m] + alpha*phat[j][m];
+            xhat_next[m] = xhat[m] + alpha*phat[m];
 
-          PR_mult(domain,level,__Mpstart,__Mplen+__Mrlen,xhat[j+1],__temp); // temp = PR*xhat
+          PR_mult(domain,level,__Mpstart,__Mplen+__Mrlen,xhat_next,__temp);  // temp = PR*xhat
           add_grids(domain,level,e_id,1.0,__e_id_old,1.0,__temp);            // e_id = e_id_old + PR*xhat
 
           // rhat = rhat - alpha*Tphat
           for (m=0;m<2*ss+1;m++)
-            rhat[j+1][m] = rhat[j][m] - alpha*Tphat[m];
+            rhat[m] = rhat[m] - alpha*Tphat[m];
 
           // r = PR*rhat //needs grid
-          PR_mult(domain,level,__Mpstart,__Mplen+__Mrlen,rhat[j+1],__r);
+          PR_mult(domain,level,__Mpstart,__Mplen+__Mrlen,rhat,__r);
 
           // calculate Grhat_new
-          double Grhat_new[2*ss+1] = {};
+          memset(Grhat_new, 0, sizeof(double)*(2*ss+1));                      // reset Grhat_next
           for(m=0;m<2*ss+1;m++){
             for(n=0;n<2*ss+1;n++){
-              Grhat_new[m] += G[m][n]*rhat[j+1][n];
+              Grhat_new[m] += G[m*(2*ss+1)+n]*rhat[n];
             }}
 	  
           // calculate rhat_new dot Grhat_new
           double rhat_newdotGrhat_new = 0;
           for(m=0;m<2*ss+1;m++)
-            rhat_newdotGrhat_new += rhat[j+1][m]*Grhat_new[m];
+            rhat_newdotGrhat_new += rhat[m]*Grhat_new[m];
 
           // calculate beta
           double beta = rhat_newdotGrhat_new / rhatdotGrhat;
 
           // phat = rhat + beta*phat
           for(m=0;m<2*ss+1;m++)
-            phat[j+1][m] = rhat[j+1][m] + beta*phat[j][m];
+            phat[m] = rhat[m] + beta*phat[m];
           
           // p = PR*phat //needs grid  
-          PR_mult(domain,level,__Mpstart,__Mplen+__Mrlen,phat[j+1],__p);
+          PR_mult(domain,level,__Mpstart,__Mplen+__Mrlen,phat,__p);
         }
         k++;                                                            
       } while(k*ss<maxits);						// }while(ks<maxits);
+      free(Tphat);
+      free(Grhat);
+      free(GTphat);
+      free(phat);
+      free(rhat);
+      free(xhat);
+      free(xhat_next);
+      free(G);
     #elif defined __USE_CG
       #warning Using Conjugate Gradient Solver with fixed number of iterations...
       // based on scanned page sent to me by Erin/Nick

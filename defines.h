@@ -24,12 +24,14 @@
 #define  __Ap         14
 #define  __As         15
 // For CACG
-#define ss            2
 #define __e_id_old    16
+/* For reference
+#define ss            2
 #define __Mpstart     17
 #define __Mplen       ss+1
 #define __Mrstart     __Mpstart+__Mplen
 #define __Mrlen       ss
+*/
 /* For reference
 #define __Mp1         17
 #define __Mp2         18

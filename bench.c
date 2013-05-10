@@ -158,17 +158,24 @@ int main(int argc, char **argv){
   int ranks_in_j=1;
   int ranks_in_k=1;
   int ss=1;
+  int levels_in_vcycle;
 
   if(argc==2){
           log2_subdomain_dim=atoi(argv[1]);
           subdomains_per_rank_in_i=256 / (1<<log2_subdomain_dim);
           subdomains_per_rank_in_j=256 / (1<<log2_subdomain_dim);
           subdomains_per_rank_in_k=256 / (1<<log2_subdomain_dim);
+  //    dim = 128 64 32 16 8 4
+  // levels =   6  5  4  3 2 1
+  levels_in_vcycle=(log2_subdomain_dim+1)-2; // ie -log2(bottom size)
   }else if(argc==5){
           log2_subdomain_dim=atoi(argv[1]);
     subdomains_per_rank_in_i=atoi(argv[2]);
     subdomains_per_rank_in_j=atoi(argv[3]);
     subdomains_per_rank_in_k=atoi(argv[4]);
+            //    dim = 128 64 32 16 8 4
+            // levels =   6  5  4  3 2 1
+            levels_in_vcycle=(log2_subdomain_dim+1)-2; // ie -log2(bottom size)
   }else if(argc==8){
           log2_subdomain_dim=atoi(argv[1]);
     subdomains_per_rank_in_i=atoi(argv[2]);
@@ -177,7 +184,10 @@ int main(int argc, char **argv){
                   ranks_in_i=atoi(argv[5]);
                   ranks_in_j=atoi(argv[6]);
                   ranks_in_k=atoi(argv[7]);
-  }else if(argc == 9){
+            //    dim = 128 64 32 16 8 4
+            // levels =   6  5  4  3 2 1
+            levels_in_vcycle=(log2_subdomain_dim+1)-2; // ie -log2(bottom size)
+  }else if(argc == 10){
           log2_subdomain_dim=atoi(argv[1]);
     subdomains_per_rank_in_i=atoi(argv[2]);
     subdomains_per_rank_in_j=atoi(argv[3]);
@@ -186,6 +196,7 @@ int main(int argc, char **argv){
                   ranks_in_j=atoi(argv[6]);
                   ranks_in_k=atoi(argv[7]);
 		          ss=atoi(argv[8]);
+            levels_in_vcycle=atoi(argv[9]);
   }else if(argc!=1){
     if(MPI_Rank==0){printf("usage: ./a.out [log2_subdomain_dim]   [subdomains per rank in i,j,k]  [ranks in i,j,k] [num of s steps]\n");}
     #ifdef _MPI
@@ -215,66 +226,48 @@ int main(int argc, char **argv){
   int subdomain_dim_i=1<<log2_subdomain_dim;
   int subdomain_dim_j=1<<log2_subdomain_dim;
   int subdomain_dim_k=1<<log2_subdomain_dim;
-  //    dim = 128 64 32 16 8 4
-  // levels =   6  5  4  3 2 1
-  int levels_in_vcycle=(log2_subdomain_dim+1)-2; // ie -log2(bottom size)
 
   //- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
-  domain_type domain_1 ;
   domain_type domain_CA;
   //- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
-  create_domain(&domain_1 ,subdomain_dim_i,subdomain_dim_j,subdomain_dim_k,
-                              subdomains_per_rank_in_i,subdomains_per_rank_in_j,subdomains_per_rank_in_k,
-                              ranks_in_i,ranks_in_j,ranks_in_k,
-                              MPI_Rank,10,1,levels_in_vcycle,ss);
   create_domain(&domain_CA,subdomain_dim_i,subdomain_dim_j,subdomain_dim_k,
                               subdomains_per_rank_in_i,subdomains_per_rank_in_j,subdomains_per_rank_in_k,
                               ranks_in_i,ranks_in_j,ranks_in_k,
-                              MPI_Rank,11,ss,levels_in_vcycle,ss);
+                              MPI_Rank,11,1,levels_in_vcycle,ss);
   //- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
   double  a=0.0;
   double  b=-1.0;
-  double h0=1.0/((double)(domain_1.dim.i));
+  double h0=1.0/((double)(domain_CA.dim.i));
   int box;
   //- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
   // define __alpha, __beta*, etc...
-  initialize_grid_to_scalar( &domain_1,0,__alpha ,h0,1.0);
-  initialize_grid_to_scalar( &domain_1,0,__beta_i,h0,1.0);
-  initialize_grid_to_scalar( &domain_1,0,__beta_j,h0,1.0);
-  initialize_grid_to_scalar( &domain_1,0,__beta_k,h0,1.0);
   initialize_grid_to_scalar(&domain_CA,0,__alpha ,h0,1.0);
   initialize_grid_to_scalar(&domain_CA,0,__beta_i,h0,1.0);
   initialize_grid_to_scalar(&domain_CA,0,__beta_j,h0,1.0);
   initialize_grid_to_scalar(&domain_CA,0,__beta_k,h0,1.0);
   //- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
   // define RHS
-  for(box=0;box< domain_1.numsubdomains;box++){__box_initialize_rhs(& domain_1.subdomains[box].levels[0],__f,h0);}
   for(box=0;box<domain_CA.numsubdomains;box++){__box_initialize_rhs(&domain_CA.subdomains[box].levels[0],__f,h0);}
   // make initial guess for __u
-  zero_grid(&domain_1 ,0,__u);
   zero_grid(&domain_CA,0,__u);
   //for(box=0;box< domain_1.numsubdomains;box++){__box_zero_grid(& domain_1.subdomains[box].levels[0],__u);}
   //for(box=0;box<domain_CA.numsubdomains;box++){__box_zero_grid(&domain_CA.subdomains[box].levels[0],__u);}
   //- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
-  MGBuild(&domain_1 );
   MGBuild(&domain_CA);
   //- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
   int s,sMax=2;
   #ifdef _MPI
   sMax=4;
   #endif
-  for(s=0;s<sMax;s++)MGSolve(&domain_1 ,__u,__f,1,a,b,h0,ss);
   for(s=0;s<sMax;s++)MGSolve(&domain_CA,__u,__f,1,a,b,h0,ss);
   //- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
   // verification....
   //- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
-  for(box=0;box< domain_1.numsubdomains;box++){__box_check_answer(& domain_1.subdomains[box].levels[0],__u,h0);}
   for(box=0;box<domain_CA.numsubdomains;box++){__box_check_answer(&domain_CA.subdomains[box].levels[0],__u,h0);}
   //- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
-  print_timing(&domain_1 );
   print_timing(&domain_CA);
+  print_timing_csv(&domain_CA);
   //- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
-  destroy_domain(&domain_1 );
   destroy_domain(&domain_CA);
   //- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
   #ifdef _MPI

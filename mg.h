@@ -49,9 +49,14 @@ typedef struct {
     uint64_t         blas1[10];
     uint64_t   collectives[10];
     uint64_t         Total[10];
-    uint64_t build;   // total time spent building the coefficients...
-    uint64_t vcycles; // total time spent in all vcycles (all CycleMG)
-    uint64_t MGSolve; // total time spent in MGSolve
+    uint64_t    bottomsolve[10];
+    uint64_t         prmult[10]; // Time spent if PRMult
+    uint64_t        applyop[10];
+    uint64_t          sstep[10]; // Time spent in inner steps
+    uint64_t build;       // total time spent building the coefficients...
+    uint64_t vcycles;     // total time spent in all vcycles (all CycleMG)
+    uint64_t MGSolve;     // total time spent in MGSolve
+    uint64_t BottomSolve; // total time spent in Bottom solver
   }cycles;
 
   int                                   rank_of_neighbor[27]; // = MPI rank of the neighbors of this process's subdomains (presumes rectahedral packing)

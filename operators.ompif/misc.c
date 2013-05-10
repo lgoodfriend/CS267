@@ -248,7 +248,6 @@ void PR_mult(domain_type * domain, int level, int id_pstart, int pr_len, double 
   int omp_within_a_box = (domain->subdomains[0].levels[level].dim.i >= CollaborativeThreadingBoxSize);
   int box;
 
-  zero_grid(domain,level,id_a); // Need to zero it out before accumulation...
   #pragma omp parallel for private(box) if(omp_across_boxes)
   for(box=0;box<domain->numsubdomains;box++){
     int i,j,k,l;
@@ -267,7 +266,12 @@ void PR_mult(domain_type * domain, int level, int id_pstart, int pr_len, double 
        for(j=0;j<dim_j;j++){
         for(i=0;i<dim_i;i++){
           int ijk = (i+ghosts) + (j+ghosts)*pencil + (k+ghosts)*plane;
-          grid_a[ijk] += bhat[l]*grid_pr[ijk];
+          if (l != 0) {
+        	  grid_a[ijk] += bhat[l]*grid_pr[ijk];
+          } else {
+        	  grid_a[ijk] = bhat[l]*grid_pr[ijk];
+          }
+
     }}}}
   }
   domain->cycles.blas1[level] += (uint64_t)(CycleTime()-_timeStart);

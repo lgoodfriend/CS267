@@ -3,6 +3,8 @@
 // SWWilliams@lbl.gov
 // Lawrence Berkeley National Lab
 //------------------------------------------------------------------------------------------------------------------------------
+#include <stdint.h>
+#include "../timer.h"
 void apply_op(domain_type * domain, int level, int Ax_id, int x_id, double a, double b, double h, int deep ){  // y= Ax
   int CollaborativeThreadingBoxSize = 100000; // i.e. never
   //int deep = 1;
@@ -13,7 +15,8 @@ void apply_op(domain_type * domain, int level, int Ax_id, int x_id, double a, do
   int omp_across_boxes = (domain->subdomains[0].levels[level].dim.i <  CollaborativeThreadingBoxSize);
   int omp_within_a_box = (domain->subdomains[0].levels[level].dim.i >= CollaborativeThreadingBoxSize);
   int box;
-
+  uint64_t _timeStart,_timeEnd;
+  _timeStart = CycleTime();
   #pragma omp parallel for private(box) if(omp_across_boxes)
   for(box=0;box<domain->numsubdomains;box++){
     int i,j,k,s;
@@ -48,6 +51,8 @@ void apply_op(domain_type * domain, int level, int Ax_id, int x_id, double a, do
       Ax[ijk] = helmholtz;
     }}}
   }
+  _timeEnd = CycleTime();
+  domain->cycles.applyop[level] += (_timeEnd-_timeStart);
 }
 
 //------------------------------------------------------------------------------------------------------------------------------

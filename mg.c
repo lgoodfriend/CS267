@@ -50,8 +50,13 @@ int create_subdomain(subdomain_type * box, int subdomain_low_i, int subdomain_lo
     __Mrlen = ss;
     if(level == (numLevels-1))__numGrids+=(7+__Mplen+__Mrlen); // BiCGStab requires additional grids r0,r,p,s,Ap,As
     #endif
-    memory_allocated += create_box(&box->levels[level],__numGrids,subdomain_low_i>>level,subdomain_low_j>>level,subdomain_low_k>>level,
-                                                                  subdomain_dim_i>>level,subdomain_dim_j>>level,subdomain_dim_k>>level,ghosts);
+    if (level == (numLevels-1)) {
+      memory_allocated += create_box(&box->levels[level],__numGrids,subdomain_low_i>>level,subdomain_low_j>>level,subdomain_low_k>>level,
+                                                                    subdomain_dim_i>>level,subdomain_dim_j>>level,subdomain_dim_k>>level,ss);
+    } else { 
+      memory_allocated += create_box(&box->levels[level],__numGrids,subdomain_low_i>>level,subdomain_low_j>>level,subdomain_low_k>>level,
+                                                                    subdomain_dim_i>>level,subdomain_dim_j>>level,subdomain_dim_k>>level,ghosts);
+    }
   }
   return(memory_allocated);
 }
@@ -447,6 +452,51 @@ void print_timing(domain_type *domain){
   printf("\n\n");fflush(stdout);
 }
 
+#define PRINT_COUNTER(__field)                       \
+  do{                                                \
+    total=0;                                         \
+    for(level=0;level < numLevels; level++)          \
+      total+=domain->cycles.__field[level];          \
+    printf("%12.6f,",SecondsPerCycle*(double)total); \
+  } while(0)
+
+
+void print_timing_csv(domain_type *domain){
+  int level,numLevels = domain->numLevels;
+  uint64_t _timeStart=CycleTime();sleep(1);uint64_t _timeEnd=CycleTime();
+  double SecondsPerCycle = (double)1.0/(double)(_timeEnd-_timeStart);
+  
+  if(domain->rank!=0)return;
+
+  uint64_t total;
+  
+  printf("CSV_HEADER==> smooth,residual,restriction,interpolation,norm,blas1,prmult,applyop,sstep,communication,s2buf,bufcopy,buf2g,pack,unpack,send,recv,wait,collectives,Total\n");
+  printf("CSV==>        ");
+  PRINT_COUNTER(smooth);
+  PRINT_COUNTER(residual);
+  PRINT_COUNTER(restriction);
+  PRINT_COUNTER(interpolation);
+  PRINT_COUNTER(norm);
+  PRINT_COUNTER(blas1);
+  PRINT_COUNTER(prmult);
+  PRINT_COUNTER(applyop);
+  PRINT_COUNTER(sstep);
+  PRINT_COUNTER(communication);
+  PRINT_COUNTER(s2buf);
+  PRINT_COUNTER(bufcopy);
+  PRINT_COUNTER(buf2g);
+  #ifdef _MPI
+  PRINT_COUNTER(pack);
+  PRINT_COUNTER(unpack);
+  PRINT_COUNTER(send);
+  PRINT_COUNTER(recv);
+  PRINT_COUNTER(wait);
+  PRINT_COUNTER(collectives);
+  #endif
+  PRINT_COUNTER(Total);
+  printf("\n");
+}
+#undef PRINT_COUNTER
 
 //------------------------------------------------------------------------------------------------------------------------------
 void MGBuild(domain_type * domain){
@@ -474,6 +524,10 @@ void MGBuild(domain_type * domain){
   domain->cycles.wait[level]          = 0;
   domain->cycles.collectives[level]   = 0;
   domain->cycles.Total[level]         = 0;
+
+  domain->cycles.applyop[level]       = 0;
+  domain->cycles.prmult[level]        = 0;
+  domain->cycles.sstep[level]         = 0;
   }
   domain->cycles.build                = 0;
   domain->cycles.vcycles              = 0;
@@ -725,10 +779,6 @@ void CycleMG(domain_type * domain, int e_id, int R_id, const double a, const dou
 
         // START S-STEPS:
         for(j=0;j < ss;j++){                                                  //   for s step
-          double tmp_norm = norm(domain, level, __r);
-          // printf("s-step=%2d, norm=%0.20f\n",j+1,tmp_norm);
-          if (tmp_norm < 0.00001) break ;                                     //   check for convergence
-          
           // Need to make current xhat the xhat_next from last time...
           tmp = xhat;
           xhat = xhat_next;
@@ -775,15 +825,10 @@ void CycleMG(domain_type * domain, int e_id, int R_id, const double a, const dou
           for (m=0;m<2*ss+1;m++)
             xhat_next[m] = xhat[m] + alpha*phat[m];
 
-          PR_mult(domain,level,__Mpstart,__Mplen+__Mrlen,xhat_next,__temp);  // temp = PR*xhat
-          add_grids(domain,level,e_id,1.0,__e_id_old,1.0,__temp);            // e_id = e_id_old + PR*xhat
-
           // rhat = rhat - alpha*Tphat
           for (m=0;m<2*ss+1;m++)
             rhat[m] = rhat[m] - alpha*Tphat[m];
 
-          // r = PR*rhat //needs grid
-          PR_mult(domain,level,__Mpstart,__Mplen+__Mrlen,rhat,__r);
 
           // calculate Grhat_new
           memset(Grhat_new, 0, sizeof(double)*(2*ss+1));                      // reset Grhat_next
@@ -804,9 +849,17 @@ void CycleMG(domain_type * domain, int e_id, int R_id, const double a, const dou
           for(m=0;m<2*ss+1;m++)
             phat[m] = rhat[m] + beta*phat[m];
           
-          // p = PR*phat //needs grid  
-          PR_mult(domain,level,__Mpstart,__Mplen+__Mrlen,phat,__p);
         }
+        // r = PR*rhat //needs grid
+        PR_mult(domain,level,__Mpstart,__Mplen+__Mrlen,rhat,__r);
+        PR_mult(domain,level,__Mpstart,__Mplen+__Mrlen,xhat_next,__temp);  // temp = PR*xhat
+        add_grids(domain,level,e_id,1.0,__e_id_old,1.0,__temp);            // e_id = e_id_old + PR*xhat
+        // p = PR*phat //needs grid  
+        PR_mult(domain,level,__Mpstart,__Mplen+__Mrlen,phat,__p);
+
+          
+        double tmp_norm = norm(domain, level, __r);
+        if (tmp_norm < 0.00001) break ;                                     //   check for convergence
         k++;                                                            
       } while(k*ss<maxits);						// }while(ks<maxits);
       free(Tphat);

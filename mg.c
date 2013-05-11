@@ -773,8 +773,16 @@ void CycleMG(domain_type * domain, int e_id, int R_id, const double a, const dou
         // form Gram matrix                                                   // G = [P,R]'*[P,R]
         for (m = 0 ; m < 2*ss+1 ; m++) { //   XXX: Abusing grid indexing, be careful >.>;;
           for (n = 0 ; n < 2*ss+1 ; n++) {
-            G[m*(2*ss+1)+n] = dot(domain, level, __Mpstart+m,__Mpstart+n);
+            G[m*(2*ss+1)+n] = local_dot(domain, level, __Mpstart+m,__Mpstart+n);
           }}
+        #ifdef _MPI
+        uint64_t _timeStartAllReduce = CycleTime();
+        MPI_Allreduce(MPI_IN_PLACE,G,(2*ss+1)*(2*ss+1),MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
+        uint64_t _timeEndAllReduce = CycleTime();
+        domain->cycles.collectives[level]   += (uint64_t)(_timeEndAllReduce-_timeStartAllReduce);
+        domain->cycles.communication[level] += (uint64_t)(_timeEndAllReduce-_timeStartAllReduce);
+        #endif
+
         scale_grid(domain,level,__e_id_old,1.0,e_id);                         //   e_id_old = e_id                                            
 
         // START S-STEPS:

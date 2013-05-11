@@ -13,6 +13,7 @@ void                  apply_op(domain_type *domain, int level, int Ax_id, int x_
 
 //double          norm_of_residual(domain_type *domain, int level, int phi_id, int rhs_id, double a, double b, double hLevel);
 double                       dot(domain_type *domain, int level, int id_a, int id_b);
+double                 local_dot(domain_type *domain, int level, int id_a, int id_b);
 double                      norm(domain_type *domain, int level, int grid_id);
   void            rebuild_lambda(domain_type *domain, int level, double a, double b, double hLevel);
   void                 add_grids(domain_type *domain, int level, int id_c, double scale_a, int id_a, double scale_b, int id_b);

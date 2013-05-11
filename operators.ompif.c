@@ -27,4 +27,5 @@
 #include "operators.ompif/misc.c"
 #include "operators.ompif/max_norm.c"
 #include "operators.ompif/dot.c"
+#include "operators.ompif/local_dot.c"
 //------------------------------------------------------------------------------------------------------------------------------

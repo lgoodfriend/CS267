@@ -452,7 +452,7 @@ void print_timing(domain_type *domain){
   printf("\n\n");fflush(stdout);
 }
 
-#define PRINT_COUNTER(__field)                       \
+#define PRINT_TOTAL(__field)                         \
   do{                                                \
     total=0;                                         \
     for(level=0;level < numLevels; level++)          \
@@ -460,8 +460,14 @@ void print_timing(domain_type *domain){
     printf("%12.6f,",SecondsPerCycle*(double)total); \
   } while(0)
 
+#define PRINT_LEVEL(__level,__field)                      \
+  do{                                                     \
+    printf("%f,",                                         \
+      SecondsPerCycle*domain->cycles.__field[(__level)]); \
+  } while(0)
 
-void print_timing_csv(domain_type *domain){
+
+void print_timing_csv(domain_type *domain,int num_procs, int size_per_proc, int ss){
   int level,numLevels = domain->numLevels;
   uint64_t _timeStart=CycleTime();sleep(1);uint64_t _timeEnd=CycleTime();
   double SecondsPerCycle = (double)1.0/(double)(_timeEnd-_timeStart);
@@ -470,33 +476,73 @@ void print_timing_csv(domain_type *domain){
 
   uint64_t total;
   
-  printf("CSV_HEADER==> smooth,residual,restriction,interpolation,norm,blas1,prmult,applyop,sstep,communication,s2buf,bufcopy,buf2g,pack,unpack,send,recv,wait,collectives,Total\n");
-  printf("CSV==>        ");
-  PRINT_COUNTER(smooth);
-  PRINT_COUNTER(residual);
-  PRINT_COUNTER(restriction);
-  PRINT_COUNTER(interpolation);
-  PRINT_COUNTER(norm);
-  PRINT_COUNTER(blas1);
-  PRINT_COUNTER(prmult);
-  PRINT_COUNTER(applyop);
-  PRINT_COUNTER(sstep);
-  PRINT_COUNTER(communication);
-  PRINT_COUNTER(s2buf);
-  PRINT_COUNTER(bufcopy);
-  PRINT_COUNTER(buf2g);
-  #ifdef _MPI
-  PRINT_COUNTER(pack);
-  PRINT_COUNTER(unpack);
-  PRINT_COUNTER(send);
-  PRINT_COUNTER(recv);
-  PRINT_COUNTER(wait);
-  PRINT_COUNTER(collectives);
+  printf("CSV_HEADER==> (alg;nodes;size;ss),smooth,residual,restriction,"
+      "interpolation,norm,blas1,prmult,applyop,communication,"
+      "s2buf,bufcopy,buf2g,pack,unpack,send,recv,wait,collectives,Total\n");
+  printf("TOTAL==> ");
+  #if defined __USE_CG
+  printf("(cg;%d;%d;%d),", num_procs,size_per_proc,ss);
+  #elif defined __USE_CACG
+  printf("(cacg;%d;%d;%d),", num_procs,size_per_proc,ss);
+  #elif defined __USE_BICGSTAB
+  printf("(bicgstab;%d;%d;%d),", num_procs,size_per_proc,ss);
+  #else
+  printf("(default;%d;%d;%d),", num_procs,size_per_proc,ss);
   #endif
-  PRINT_COUNTER(Total);
+  PRINT_TOTAL(smooth);
+  PRINT_TOTAL(residual);
+  PRINT_TOTAL(restriction);
+  PRINT_TOTAL(interpolation);
+  PRINT_TOTAL(norm);
+  PRINT_TOTAL(blas1);
+  PRINT_TOTAL(prmult);
+  PRINT_TOTAL(applyop);
+  PRINT_TOTAL(communication);
+  PRINT_TOTAL(s2buf);
+  PRINT_TOTAL(bufcopy);
+  PRINT_TOTAL(buf2g);
+  PRINT_TOTAL(pack);
+  PRINT_TOTAL(unpack);
+  PRINT_TOTAL(send);
+  PRINT_TOTAL(recv);
+  PRINT_TOTAL(wait);
+  PRINT_TOTAL(collectives);
+  PRINT_TOTAL(Total);
+  printf("\n");
+
+  printf("BOTTOM_SOLVE==> ");
+  #if defined __USE_CG
+  printf("(cg;%d;%d;%d),", num_procs,size_per_proc,ss);
+  #elif defined __USE_CACG
+  printf("(cacg;%d;%d;%d),", num_procs,size_per_proc,ss);
+  #elif defined __USE_BICGSTAB
+  printf("(bicgstab;%d;%d;%d),", num_procs,size_per_proc,ss);
+  #else
+  printf("(default;%d;%d;%d),", num_procs,size_per_proc,ss);
+  #endif
+  PRINT_LEVEL(numLevels-1,smooth);
+  PRINT_LEVEL(numLevels-1,residual);
+  PRINT_LEVEL(numLevels-1,restriction);
+  PRINT_LEVEL(numLevels-1,interpolation);
+  PRINT_LEVEL(numLevels-1,norm);
+  PRINT_LEVEL(numLevels-1,blas1);
+  PRINT_LEVEL(numLevels-1,prmult);
+  PRINT_LEVEL(numLevels-1,applyop);
+  PRINT_LEVEL(numLevels-1,communication);
+  PRINT_LEVEL(numLevels-1,s2buf);
+  PRINT_LEVEL(numLevels-1,bufcopy);
+  PRINT_LEVEL(numLevels-1,buf2g);
+  PRINT_LEVEL(numLevels-1,pack);
+  PRINT_LEVEL(numLevels-1,unpack);
+  PRINT_LEVEL(numLevels-1,send);
+  PRINT_LEVEL(numLevels-1,recv);
+  PRINT_LEVEL(numLevels-1,wait);
+  PRINT_LEVEL(numLevels-1,collectives);
+  PRINT_LEVEL(numLevels-1,Total);
   printf("\n");
 }
-#undef PRINT_COUNTER
+#undef PRINT_TOTAL
+#undef PRINT_LEVEL
 
 //------------------------------------------------------------------------------------------------------------------------------
 void MGBuild(domain_type * domain){
@@ -527,7 +573,6 @@ void MGBuild(domain_type * domain){
 
   domain->cycles.applyop[level]       = 0;
   domain->cycles.prmult[level]        = 0;
-  domain->cycles.sstep[level]         = 0;
   }
   domain->cycles.build                = 0;
   domain->cycles.vcycles              = 0;
@@ -771,6 +816,7 @@ void CycleMG(domain_type * domain, int e_id, int R_id, const double a, const dou
         }
 
         // form Gram matrix                                                   // G = [P,R]'*[P,R]
+        /*
         for (m = 0 ; m < 2*ss+1 ; m++) { //   XXX: Abusing grid indexing, be careful >.>;;
           for (n = 0 ; n < 2*ss+1 ; n++) {
             G[m*(2*ss+1)+n] = local_dot(domain, level, __Mpstart+m,__Mpstart+n);
@@ -782,6 +828,11 @@ void CycleMG(domain_type * domain, int e_id, int R_id, const double a, const dou
         domain->cycles.collectives[level]   += (uint64_t)(_timeEndAllReduce-_timeStartAllReduce);
         domain->cycles.communication[level] += (uint64_t)(_timeEndAllReduce-_timeStartAllReduce);
         #endif
+        */
+        for (m = 0 ; m < 2*ss+1 ; m++) { //   XXX: Abusing grid indexing, be careful >.>;;
+          for (n = 0 ; n < 2*ss+1 ; n++) {
+            G[m*(2*ss+1)+n] = dot(domain, level, __Mpstart+m,__Mpstart+n);
+          }}
 
         scale_grid(domain,level,__e_id_old,1.0,e_id);                         //   e_id_old = e_id                                            
 

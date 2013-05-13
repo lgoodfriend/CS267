@@ -274,5 +274,5 @@ void PR_mult(domain_type * domain, int level, int id_pstart, int pr_len, double 
 
     }}}}
   }
-  domain->cycles.blas1[level] += (uint64_t)(CycleTime()-_timeStart);
+  domain->cycles.prmult[level] += (uint64_t)(CycleTime()-_timeStart);
 }

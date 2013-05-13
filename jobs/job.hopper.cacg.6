@@ -1,0 +1,29 @@
+#PBS -N CommunicationAvoidingMultiGrid
+#PBS -o results/results.hopper.cacg.6.$PBS_JOBID
+#PBS -j oe
+#PBS -q regular
+#PBS -l walltime=00:30:00
+#PBS -l mppwidth=216
+#PBS -l mppdepth=6
+#PBS -l mppnppn=4
+
+set -x
+cd $PBS_O_WORKDIR
+module swap PrgEnv-pgi PrgEnv-intel
+
+export OMP_NUM_THREAD=6
+
+aprun -n 216 -d 6 -N 4 -S 1 -ss -cc numa_node ./test.hopper.ompif.bicgstab 6 1 1 1 6 6 6
+aprun -n 216 -d 6 -N 4 -S 1 -ss -cc numa_node ./test.hopper.ompif.cg 6 1 1 1 6 6 6
+aprun -n 216 -d 6 -N 4 -S 1 -ss -cc numa_node ./test.hopper.ompif.cacg 6 1 1 1 6 6 6 2 5
+aprun -n 216 -d 6 -N 4 -S 1 -ss -cc numa_node ./test.hopper.ompif.cacg 6 1 1 1 6 6 6 4 5
+
+aprun -n 216 -d 6 -N 4 -S 1 -ss -cc numa_node ./test.hopper.ompif.bicgstab 6 2 2 2 6 6 6
+aprun -n 216 -d 6 -N 4 -S 1 -ss -cc numa_node ./test.hopper.ompif.cg 6 2 2 2 6 6 6
+aprun -n 216 -d 6 -N 4 -S 1 -ss -cc numa_node ./test.hopper.ompif.cacg 6 2 2 2 6 6 6 2 5
+aprun -n 216 -d 6 -N 4 -S 1 -ss -cc numa_node ./test.hopper.ompif.cacg 6 2 2 2 6 6 6 4 5
+
+aprun -n 216 -d 6 -N 4 -S 1 -ss -cc numa_node ./test.hopper.ompif.bicgstab 6 4 4 4 6 6 6
+aprun -n 216 -d 6 -N 4 -S 1 -ss -cc numa_node ./test.hopper.ompif.cg 6 4 4 4 6 6 6
+aprun -n 216 -d 6 -N 4 -S 1 -ss -cc numa_node ./test.hopper.ompif.cacg 6 4 4 4 6 6 6 2 5
+aprun -n 216 -d 6 -N 4 -S 1 -ss -cc numa_node ./test.hopper.ompif.cacg 6 4 4 4 6 6 6 4 5

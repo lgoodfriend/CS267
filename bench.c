@@ -266,7 +266,10 @@ int main(int argc, char **argv){
   for(box=0;box<domain_CA.numsubdomains;box++){__box_check_answer(&domain_CA.subdomains[box].levels[0],__u,h0);}
   //- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
   print_timing(&domain_CA);
-  print_timing_csv(&domain_CA);
+  print_timing_csv(&domain_CA,
+		  ranks_in_i*ranks_in_j*ranks_in_k,
+		  subdomains_per_rank_in_i*subdomain_dim_i,
+		  ss);
   //- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
   destroy_domain(&domain_CA);
   //- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 

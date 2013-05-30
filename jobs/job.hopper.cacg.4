@@ -2,7 +2,7 @@
 #PBS -o results/results.hopper.cacg.4.$PBS_JOBID
 #PBS -j oe
 #PBS -q regular
-#PBS -l walltime=00:30:00
+#PBS -l walltime=01:00:00
 #PBS -l mppwidth=64
 #PBS -l mppdepth=6
 #PBS -l mppnppn=4
@@ -13,19 +13,7 @@ module swap PrgEnv-pgi PrgEnv-intel
 
 export OMP_NUM_THREAD=6
 
-aprun -n 64 -d 6 -N 4 -S 1 -ss -cc numa_node ./test.hopper.ompif.bicgstab 6 1 1 1 4 4 4
-aprun -n 64 -d 6 -N 4 -S 1 -ss -cc numa_node ./test.hopper.ompif.cg 6 1 1 1 4 4 4
-aprun -n 64 -d 6 -N 4 -S 1 -ss -cc numa_node ./test.hopper.ompif.cacg 6 1 1 1 4 4 4 2 5
-aprun -n 64 -d 6 -N 4 -S 1 -ss -cc numa_node ./test.hopper.ompif.cacg 6 1 1 1 4 4 4 4 5
-aprun -n 64 -d 6 -N 4 -S 1 -ss -cc numa_node ./test.hopper.ompif.cacg 6 1 1 1 4 4 4 6 5
-aprun -n 64 -d 6 -N 4 -S 1 -ss -cc numa_node ./test.hopper.ompif.bicgstab 6 2 2 2 4 4 4
-aprun -n 64 -d 6 -N 4 -S 1 -ss -cc numa_node ./test.hopper.ompif.cg 6 2 2 2 4 4 4
-aprun -n 64 -d 6 -N 4 -S 1 -ss -cc numa_node ./test.hopper.ompif.cacg 6 2 2 2 4 4 4 2 5
-aprun -n 64 -d 6 -N 4 -S 1 -ss -cc numa_node ./test.hopper.ompif.cacg 6 2 2 2 4 4 4 4 5
-aprun -n 64 -d 6 -N 4 -S 1 -ss -cc numa_node ./test.hopper.ompif.cacg 6 2 2 2 4 4 4 6 5
-aprun -n 64 -d 6 -N 4 -S 1 -ss -cc numa_node ./test.hopper.ompif.bicgstab 6 4 4 4 4 4 4
-aprun -n 64 -d 6 -N 4 -S 1 -ss -cc numa_node ./test.hopper.ompif.cg 6 4 4 4 4 4 4
-aprun -n 64 -d 6 -N 4 -S 1 -ss -cc numa_node ./test.hopper.ompif.cacg 6 4 4 4 4 4 4 2 5
-aprun -n 64 -d 6 -N 4 -S 1 -ss -cc numa_node ./test.hopper.ompif.cacg 6 4 4 4 4 4 4 4 5
-aprun -n 64 -d 6 -N 4 -S 1 -ss -cc numa_node ./test.hopper.ompif.cacg 6 4 4 4 4 4 4 6 5
-aprun -n 64 -d 6 -N 4 -S 1 -ss -cc numa_node ./test.hopper.ompif.bicgstab 7 4 4 4 4 4 4
+aprun -n 64 -d 6 -N 4 -S 1 -ss -cc numa_node ./test.hopper.ompif.bicgstab 5 1 1 1 4 4 4
+aprun -n 64 -d 6 -N 4 -S 1 -ss -cc numa_node ./test.hopper.ompif.cg 5 1 1 1 4 4 4
+aprun -n 64 -d 6 -N 4 -S 1 -ss -cc numa_node ./test.hopper.ompif.cacg 5 1 1 1 4 4 4 2
+aprun -n 64 -d 6 -N 4 -S 1 -ss -cc numa_node ./test.hopper.ompif.cacg 5 1 1 1 4 4 4 4

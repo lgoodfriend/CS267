@@ -8,7 +8,7 @@ HEADERS =
 EXTRA = bench.c mg.c box.c timer.x86.c
 TARGETS = run.hopper.naive run.hopper.reference run.hopper.fusion \
 	  run.hopper.ompif test.hopper.ompif.cg test.hopper.ompif.bicgstab \
-	  test.hopper.ompif.cacg \
+	  test.hopper.ompif.cacg test.hopper.ompif.cacg.test\
 
 all:	$(TARGETS)
 
@@ -32,6 +32,12 @@ test.hopper.ompif.cacg: $(EXTRA) operators.ompif.c
 	cc -O0 -fno-alias -fno-fnalias -msse3 -openmp $(EXTRA) \
 		operators.ompif.c -traceback -check=stack,uninit \
 		-D_MPI -D__PRINT_NORM -D__PRINT_COMMUNICATION_BREAKDOWN -D__USE_CACG \
+		-o $@ -g
+
+test.hopper.ompif.cacg.test: $(EXTRA) operators.ompif.c
+	cc -O0 -fno-alias -fno-fnalias -msse3 -openmp $(EXTRA) \
+		operators.ompif.c -traceback -check=stack,uninit \
+		-D__PRINT_NORM -D__PRINT_COMMUNICATION_BREAKDOWN -D__USE_CACG \
 		-o $@ -g
 
 run.hopper.reference: $(EXTRA) operators.reference.c

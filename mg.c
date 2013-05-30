@@ -795,6 +795,10 @@ void CycleMG(domain_type * domain, int e_id, int R_id, const double a, const dou
         memset(xhat_next, 0, sizeof(double)*(2*ss+1));                        // initialize xhat_next
         int i,j,m,n,o;
 
+        /* TODO:
+         * - Make the number of runs based on depth of ghost-zones
+         * - exchange_boundary(...,1,1,1) once per 'ghosts' iterations as per sam's email
+
         // compute matrix powers kernel for p                                 // P = [Mp0..Mp(ss)]
         for (i = 0; i < __Mplen ; i++) {
           if (i == 0) {
@@ -814,9 +818,30 @@ void CycleMG(domain_type * domain, int e_id, int R_id, const double a, const dou
             apply_op(domain,level,i+__Mrstart,i+__Mrstart-1,a,b,hLevel,ss-i); // Mri = (A^i)r
           }
         }
+        */
+
+        /* For now we just want to do it the more straightforward way [always ghosts of depth 1] */
+        for ( i = 0 ; i < __Mplen ; i++) {
+          if (i == 0) {
+            scale_grid(domain,level,i+__Mpstart,1.0,__p);                     // Mp0 = p
+            exchange_boundary(domain,level,i+__Mpstart,1,0,0);                // exchange_boundary(Mp(i-1))
+          } else {
+            apply_op(domain,level,i+__Mpstart,i+__Mpstart-1,a,b,hLevel,1);    // Mpi = (A^i)p
+            exchange_boundary(domain,level,i+__Mpstart,1,0,0);                // exchange_boundary(Mp(i-1))
+          }
+        }
+
+        for ( i = 0 ; i < __Mrlen ; i++) {
+          if (i == 0) {
+            scale_grid(domain,level,i+__Mrstart,1.0,__r);                     // Mr0 = r
+            exchange_boundary(domain,level,i+__Mrstart,1,0,0);                // exchange_boundary(Mr(i-1))
+          } else {
+            apply_op(domain,level,i+__Mrstart,i+__Mrstart-1,a,b,hLevel,1);    // Mri = (A^i)r
+            exchange_boundary(domain,level,i+__Mrstart,1,0,0);                // exchange_boundary(Mr(i-1))
+          }
+        }
 
         // form Gram matrix                                                   // G = [P,R]'*[P,R]
-        /*
         for (m = 0 ; m < 2*ss+1 ; m++) { //   XXX: Abusing grid indexing, be careful >.>;;
           for (n = 0 ; n < 2*ss+1 ; n++) {
             G[m*(2*ss+1)+n] = local_dot(domain, level, __Mpstart+m,__Mpstart+n);
@@ -828,11 +853,12 @@ void CycleMG(domain_type * domain, int e_id, int R_id, const double a, const dou
         domain->cycles.collectives[level]   += (uint64_t)(_timeEndAllReduce-_timeStartAllReduce);
         domain->cycles.communication[level] += (uint64_t)(_timeEndAllReduce-_timeStartAllReduce);
         #endif
-        */
+        /*
         for (m = 0 ; m < 2*ss+1 ; m++) { //   XXX: Abusing grid indexing, be careful >.>;;
           for (n = 0 ; n < 2*ss+1 ; n++) {
             G[m*(2*ss+1)+n] = dot(domain, level, __Mpstart+m,__Mpstart+n);
           }}
+        */
 
         scale_grid(domain,level,__e_id_old,1.0,e_id);                         //   e_id_old = e_id                                            
 

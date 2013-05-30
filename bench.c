@@ -187,7 +187,7 @@ int main(int argc, char **argv){
             //    dim = 128 64 32 16 8 4
             // levels =   6  5  4  3 2 1
             levels_in_vcycle=(log2_subdomain_dim+1)-2; // ie -log2(bottom size)
-  }else if(argc == 10){
+  }else if(argc == 9){
           log2_subdomain_dim=atoi(argv[1]);
     subdomains_per_rank_in_i=atoi(argv[2]);
     subdomains_per_rank_in_j=atoi(argv[3]);
@@ -196,7 +196,9 @@ int main(int argc, char **argv){
                   ranks_in_j=atoi(argv[6]);
                   ranks_in_k=atoi(argv[7]);
 		          ss=atoi(argv[8]);
-            levels_in_vcycle=atoi(argv[9]);
+	    //    dim = 128 64 32 16 8 4
+            // levels =   6  5  4  3 2 1
+            levels_in_vcycle=(log2_subdomain_dim+1)-2; // ie -log2(bottom size)
   }else if(argc!=1){
     if(MPI_Rank==0){printf("usage: ./a.out [log2_subdomain_dim]   [subdomains per rank in i,j,k]  [ranks in i,j,k] [num of s steps]\n");}
     #ifdef _MPI
